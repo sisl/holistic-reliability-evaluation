@@ -42,6 +42,8 @@ test_loader = DataLoader(test_data, shuffle=False, sampler=None, batch_size=32)
 state = torch.load('trained_models/camelyon17_erm_densenet121_seed0/best_model.pth', map_location=torch.device('cpu'))
 state = state['algorithm']
 
+state['model.features.denseblock4.denselayer11.norm1.running_var']
+
 # TODO Load the algorithm?
 # Pickle the configuration and then load it in here to use it to develope the algorithm
 # or populate_defaults
@@ -55,16 +57,18 @@ for k in state:
 # get constructor and last layer names:
 model = initialize_torchvision_model('densenet121', 2)
 model.load_state_dict(newstate)
-
-
-test_loader
+model.eval()
 
 input, y, metadata = next(iter(test_loader))
-model(input)
-print(input)
+y_pred = model(input)
 
-y
 y_pred
 y_pred = wilds.common.metrics.all_metrics.multiclass_logits_to_pred(y_pred)
-y
 y_pred
+sum(y == y_pred) / len(y)
+
+model(torch.zeros(1,3,96,96))
+
+model.state_dict()['features.norm5.running_var']
+
+model.state_dict()
