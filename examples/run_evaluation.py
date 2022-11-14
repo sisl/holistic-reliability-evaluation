@@ -5,10 +5,11 @@ import pickle
 
 from holistic_reliability_evaluation.load_datasets import load_camelyon17
 from holistic_reliability_evaluation.load_models import load_densenet121
-from holistic_reliability_evaluation.eval_functions import eval_accuracy, get_vals, eval_error_correlation
+from holistic_reliability_evaluation.eval_functions import eval_accuracy, get_vals, eval_error_correlation, eval_robust_accuracy
 
-nbatches=None
+nbatches=1
 shuffle_data=False
+nexamples_adv = 100
 
 data_dir = "data/"
 device = torch.device('mps')
@@ -17,6 +18,9 @@ out_dim = 2
 # Load Datasets
 ID_dataset = load_camelyon17(data_dir, split="val", shuffle=shuffle_data)
 OD_dataset = load_camelyon17(data_dir, split="test", shuffle=shuffle_data)
+
+ID_dataset_random = load_camelyon17(data_dir, split="val", shuffle=True, batch_size=nexamples_adv)
+OD_dataset_random = load_camelyon17(data_dir, split="test", shuffle=True, batch_size=nexamples_adv)
 
 # Load models
 erm0 = load_densenet121("trained_models/camelyon17_erm_densenet121_seed0/best_model.pth", out_dim)
@@ -30,16 +34,26 @@ names = ["ERM-seed0", "ERM-seed1", "SWAV-seed0", "SWAV-seed1"]
 # Compute model outputs
 results = {}
 for model, name in zip(models, names):
+    print('solving: ', name)
     ID_true, ID_pred = get_vals(model, ID_dataset, nbatches=nbatches, device=device)
     OD_true, OD_pred = get_vals(model, OD_dataset, nbatches=nbatches, device=device)
     
-    results[name] = {'ID_true': ID_true, 'ID_pred': ID_pred, 'OD_true':OD_true, 'OD_pred':OD_pred}
-
+    ID_advrob_acc = eval_robust_accuracy(model, ID_dataset_random)
+    OD_advrob_acc = eval_robust_accuracy(model, OD_dataset_random)
+    
+    print('ID_advrob_acc: ', ID_advrob_acc,  ' OD_advrob_acc: ', OD_advrob_acc)
+    
+    results[name] = {'ID_true':ID_true, 
+                     'ID_pred': ID_pred, 
+                     'OD_true':OD_true, 
+                     'OD_pred':OD_pred,
+                     'ID_advrob_acc':ID_advrob_acc,
+                     'OD_advrob_acc':OD_advrob_acc }
 
 # pickle the results
-file = open('results', 'wb')
-pickle.dump(results, file)
-file.close()
+# file = open('results', 'wb')
+# pickle.dump(results, file)
+# file.close()
 
 # file = open('results', 'rb')
 # results = pickle.load(file)
@@ -62,4 +76,9 @@ for name in results:
         ID_correlations.append(ID_correlation)
         OD_correlations.append(OD_correlation)
 
-    print(name, " Results --> ID Acc: ", ID_acc, " OD acc: ", OD_acc, " ID correlations: ", ID_correlations, " OD_correlations: ", OD_correlations)
+    print(name, " Results --> ID Acc: ", ID_acc, 
+                " OD acc: ", OD_acc,
+                " Adv Robust Acc (ID): ", results[name]['ID_advrob_acc'],
+                " Adv Robust Acc (OD): ", results[name]['OD_advrob_acc'],
+                " ID correlations: ", ID_correlations, 
+                " OD_correlations: ", OD_correlations)
