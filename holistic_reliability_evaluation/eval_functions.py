@@ -1,37 +1,37 @@
 import wilds
 import torch
 from autoattack import AutoAttack
+import torchmetrics
 
-
-def get_vals(model, loader, nbatches=None, device=torch.device('cpu')):
+def predict_model(model, loader, nbatches=None, device=torch.device('cpu')):
     model.to(device)
     model.eval()
     y_true = []
-    y_pred = []
+    model_logits = []
     i=0
     for x, y, metadata in loader:
-        y_pred_batch = model(x.to(device))
-        y_pred_batch = wilds.common.metrics.all_metrics.multiclass_logits_to_pred(y_pred_batch)
-        y_pred.append(y_pred_batch.detach().clone())
-        y_true.append(y.detach().clone().to(device))
+        pred = model(x.to(device))
+        model_logits.append(pred.detach().clone().to(torch.device('cpu')))
+        y_true.append(y.detach().clone().to(torch.device('cpu')))
         
         i=i+1
         if nbatches is not None and i >= nbatches:
             break
     
-    y_true = torch.cat(y_true).detach().clone().to(torch.device('cpu'))
-    y_pred = torch.cat(y_pred).detach().clone().to(torch.device('cpu'))
-    return y_true, y_pred
+    y_true = torch.cat(y_true)
+    model_logits = torch.cat(model_logits)
+    return y_true, model_logits
 
-def get_errors(y_true, y_pred):
+def get_errors(y_true, model_logits):
+    y_pred = wilds.common.metrics.all_metrics.multiclass_logits_to_pred(model_logits)
     return y_true != y_pred
 
-def eval_accuracy(y_true, y_pred):
-    return 1 - sum(get_errors(y_true, y_pred)).item() / y_true.size(0)
+def eval_accuracy(y_true, model_logits):
+    return 1 - sum(get_errors(y_true, model_logits)).item() / y_true.size(0)
 
-def eval_error_correlation(y1_true, y1_pred, y2_true, y2_pred):
-    errors1 = get_errors(y1_true, y1_pred)
-    errors2 = get_errors(y2_true, y2_pred)
+def eval_error_correlation(y1_true, model1_logits, y2_true, model2_logits):
+    errors1 = get_errors(y1_true, model1_logits)
+    errors2 = get_errors(y2_true, model2_logits)
     
     # Compute the correlaion coeff: https://math.stackexchange.com/questions/610443/finding-a-correlation-between-bernoulli-variables
     a = errors1.logical_and(errors2).float().mean()
@@ -44,12 +44,16 @@ def eval_error_correlation(y1_true, y1_pred, y2_true, y2_pred):
     return (cov / (sigmax * sigmay)).item()
     
     
-def eval_robust_accuracy(model, loader):
+def eval_adv_robust_accuracy(model, loader):
     model.to(torch.device('cpu'))
     adversary = AutoAttack(model, norm='Linf', eps=8/255, version='custom', device='cpu', attacks_to_run=['apgd-ce'])
 
     input, y, md = next(iter(loader))
     xadv, yadv = adversary.run_standard_evaluation(input, y, bs=input.size(0), return_labels=True)
     return eval_accuracy(y, yadv)
+
+
+def eval_ece(y_true, model_logits):
+    return torchmetrics.functional.calibration_error(model_logits.softmax(1), y_true).item()
     
     

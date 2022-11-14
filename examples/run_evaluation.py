@@ -5,11 +5,11 @@ import pickle
 
 from holistic_reliability_evaluation.load_datasets import load_camelyon17
 from holistic_reliability_evaluation.load_models import load_densenet121
-from holistic_reliability_evaluation.eval_functions import eval_accuracy, get_vals, eval_error_correlation, eval_robust_accuracy
+from holistic_reliability_evaluation.eval_functions import eval_accuracy, predict_model, eval_error_correlation, eval_adv_robust_accuracy, eval_ece
 
 nbatches=1
 shuffle_data=False
-nexamples_adv = 100
+nexamples_adv = 1
 
 data_dir = "data/"
 device = torch.device('mps')
@@ -33,52 +33,61 @@ names = ["ERM-seed0", "ERM-seed1", "SWAV-seed0", "SWAV-seed1"]
 
 # Compute model outputs
 results = {}
+outputs = {}
 for model, name in zip(models, names):
     print('solving: ', name)
-    ID_true, ID_pred = get_vals(model, ID_dataset, nbatches=nbatches, device=device)
-    OD_true, OD_pred = get_vals(model, OD_dataset, nbatches=nbatches, device=device)
+    ID_true, ID_logits = predict_model(model, ID_dataset, nbatches=nbatches, device=device)
+    OD_true, OD_logits = predict_model(model, OD_dataset, nbatches=nbatches, device=device)
     
-    ID_advrob_acc = eval_robust_accuracy(model, ID_dataset_random)
-    OD_advrob_acc = eval_robust_accuracy(model, OD_dataset_random)
+    ID_accuracy = eval_accuracy(ID_true, ID_logits)
+    OD_accuracy = eval_accuracy(OD_true, OD_logits)
     
-    print('ID_advrob_acc: ', ID_advrob_acc,  ' OD_advrob_acc: ', OD_advrob_acc)
+    ID_advrob_acc = 0 #eval_adv_robust_accuracy(model, ID_dataset_random)
+    OD_advrob_acc = 0 #eval_adv_robust_accuracy(model, OD_dataset_random)
     
-    results[name] = {'ID_true':ID_true, 
-                     'ID_pred': ID_pred, 
+    ID_ece = eval_ece(ID_true, ID_logits)
+    OD_ece = eval_ece(OD_true, OD_logits)
+    
+    outputs[name] = {'ID_true':ID_true, 
+                     'ID_logits': ID_logits, 
                      'OD_true':OD_true, 
-                     'OD_pred':OD_pred,
-                     'ID_advrob_acc':ID_advrob_acc,
-                     'OD_advrob_acc':OD_advrob_acc }
+                     'OD_logits':OD_logits}
+    results[name] = {'ID_advrob_acc':ID_advrob_acc,
+                     'OD_advrob_acc':OD_advrob_acc,
+                     'ID_ece':ID_ece,
+                     'OD_ece':OD_ece}
+    
+    
 
 # pickle the results
-# file = open('results', 'wb')
-# pickle.dump(results, file)
-# file.close()
+file = open('outputs', 'wb')
+pickle.dump(outputs, file)
+file.close()
+
+file = open('results', 'wb')
+pickle.dump(results, file)
+file.close()
 
 # file = open('results', 'rb')
 # results = pickle.load(file)
 # file.close()
 
-# Evaluate the results
-for name in results:
-    ID_true, ID_pred = results[name]['ID_true'], results[name]['ID_pred']
-    OD_true, OD_pred = results[name]['OD_true'], results[name]['OD_pred']
-    ID_acc = eval_accuracy(ID_true, ID_pred)
-    OD_acc = eval_accuracy(OD_true, OD_pred)
+# Evaluate the error correlations
+for name in outputs:
+    ID_true, ID_logits = outputs[name]['ID_true'], outputs[name]['ID_logits']
+    OD_true, OD_logits = outputs[name]['OD_true'], outputs[name]['OD_logits']
 
     ID_correlations = []
     OD_correlations = []
-    for name2 in results:
-        ID_true2, ID_pred2 = results[name2]['ID_true'], results[name2]['ID_pred']
-        OD_true2, OD_pred2 = results[name2]['OD_true'], results[name2]['OD_pred']
-        ID_correlation = eval_error_correlation(ID_true, ID_pred, ID_true2, ID_pred2)
-        OD_correlation = eval_error_correlation(OD_true, OD_pred, OD_true2, OD_pred2)
+    for name2 in outputs:
+        ID_true2, ID_logits2 = outputs[name2]['ID_true'], outputs[name2]['ID_logits']
+        OD_true2, OD_logits2 = outputs[name2]['OD_true'], outputs[name2]['OD_logits']
+        ID_correlation = eval_error_correlation(ID_true, ID_logits, ID_true2, ID_logits2)
+        OD_correlation = eval_error_correlation(OD_true, OD_logits, OD_true2, OD_logits2)
         ID_correlations.append(ID_correlation)
         OD_correlations.append(OD_correlation)
+    results[name]['ID_correlations'] = ID_correlations
+    results[name]['OD_correlations'] = OD_correlations
 
-    print(name, " Results --> ID Acc: ", ID_acc, 
-                " OD acc: ", OD_acc,
-                " Adv Robust Acc (ID): ", results[name]['ID_advrob_acc'],
-                " Adv Robust Acc (OD): ", results[name]['OD_advrob_acc'],
-                " ID correlations: ", ID_correlations, 
-                " OD_correlations: ", OD_correlations)
+for name in results:    
+    print(results[name])
