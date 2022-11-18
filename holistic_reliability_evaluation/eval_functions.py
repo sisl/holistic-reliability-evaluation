@@ -1,4 +1,5 @@
 import wilds
+import wilds.common.metrics.all_metrics
 import torch
 from autoattack import AutoAttack
 import torchmetrics
@@ -44,13 +45,13 @@ def eval_error_correlation(y1_true, model1_logits, y2_true, model2_logits):
     return (cov / (sigmax * sigmay)).item()
     
     
-def eval_adv_robust_accuracy(model, loader):
-    model.to(torch.device('cpu'))
-    adversary = AutoAttack(model, norm='Linf', eps=8/255, version='custom', device='cpu', attacks_to_run=['apgd-ce'])
+def eval_adv_robust_accuracy(model, loader, device=torch.device('cpu')):
+    model.to(device)
+    adversary = AutoAttack(model, norm='Linf', eps=8/255, version='custom', device='cuda', attacks_to_run=['apgd-ce'])
 
     input, y, md = next(iter(loader))
-    xadv, yadv = adversary.run_standard_evaluation(input, y, bs=input.size(0), return_labels=True)
-    return eval_accuracy(y, yadv)
+    xadv, yadv = adversary.run_standard_evaluation(input.to(device), y.to(device), bs=input.size(0), return_labels=True)
+    return sum(y.to(device) == yadv).item() / y.size(0)
 
 
 def eval_ece(y_true, model_logits):
