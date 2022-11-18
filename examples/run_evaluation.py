@@ -7,9 +7,9 @@ from holistic_reliability_evaluation.load_datasets import load_camelyon17
 from holistic_reliability_evaluation.load_models import load_densenet121
 from holistic_reliability_evaluation.eval_functions import eval_accuracy, predict_model, eval_error_correlation, eval_adv_robust_accuracy, eval_ece
 
-nbatches=None
+nbatches=1 # Set this to None if you want full evaluation
 shuffle_data=False
-nexamples_adv = 250
+nexamples_adv = 1 # Previously set to 250 for first round of experiments.
 
 data_dir = "data/"
 device = torch.device('cuda')
