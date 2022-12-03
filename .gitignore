@@ -2,6 +2,7 @@ trained_models/
 data/
 .vscode/
 results
+outputs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
