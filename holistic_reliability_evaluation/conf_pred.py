@@ -8,7 +8,7 @@ from holistic_reliability_evaluation.load_datasets import load_camelyon17_cal, l
 from holistic_reliability_evaluation.load_models import load_densenet121
 from holistic_reliability_evaluation.eval_functions import predict_model
 
-nbatches=None # Set this to None if you want full evaluation
+nbatches=100 # Set this to None if you want full evaluation
 shuffle_data=False
 nexamples_adv = 1 # Previously set to 250 for first round of experiments.
 
@@ -28,7 +28,13 @@ alpha = 0.4
 
 #load data
 data = load_camelyon17(data_dir, split="test", shuffle=False, batch_size=32, pin_memory=True)
-labels, logits = predict_model(swav0, data, nbatches=nbatches, device=device)
+labels, logits = predict_model(erm0, data, nbatches=nbatches, device=torch.device('cpu'))
+
+print(data.dataset[0])
+erm0(torch.zeros(1,3,96,96).cuda())
+erm0.classifier.bias
+
+print(logits.isnan().any())
 logits = torch.nan_to_num(logits)
 
 #compute and divide softmax scores
