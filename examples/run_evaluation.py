@@ -1,6 +1,6 @@
 import torch
 import sys
-sys.path.append('/home/acorso/Workspace/holistic-reliability-evaluation/')
+sys.path.append('/Users/anthonycorso/Workspace/holistic-reliability-evaluation/')
 import pickle
 import pytorch_ood as ood
 
@@ -12,7 +12,7 @@ nbatches=1 # Set this to None if you want full evaluation
 nexamples_adv = 1 # Previously set to 250 for first round of experiments.
 
 data_dir = "data/"
-device = torch.device('cuda')
+device = torch.device('mps')
 out_dim = 2
 
 # Load Datasets
@@ -26,12 +26,10 @@ ID_dataset_random = load_wilds_dataset("camelyon17", data_dir, split="id_val", s
 DS_dataset_random = load_wilds_dataset("camelyon17", data_dir, split="test", shuffle=True, batch_size=nexamples_adv)
 
 # Load models
-erm0 = load_densenet121("trained_models/camelyon17_erm_densenet121_seed0/best_model.pth", out_dim)
-erm1 = load_densenet121("trained_models/camelyon17_erm_densenet121_seed1/best_model.pth", out_dim)
-swav0 = load_densenet121("trained_models/camelyon17_swav55_ermaugment_seed0/camelyon17_seed:0_epoch:best_model.pth", out_dim, prefix='model.0.')
-swav1 = load_densenet121("trained_models/camelyon17_swav55_ermaugment_seed1/camelyon17_seed:1_epoch:best_model.pth", out_dim, prefix='model.0.')
-
-eval_ood(ood.detector.MaxSoftmax(erm0), [ID_dataset], [OD1_dataset], device)
+erm0 = load_densenet121("trained_models/camelyon17_erm_densenet121_seed0/best_model.pth", out_dim, device=device)
+erm1 = load_densenet121("trained_models/camelyon17_erm_densenet121_seed1/best_model.pth", out_dim, device=device)
+swav0 = load_densenet121("trained_models/camelyon17_swav55_ermaugment_seed0/camelyon17_seed:0_epoch:best_model.pth", out_dim, prefix='model.0.', device=device)
+swav1 = load_densenet121("trained_models/camelyon17_swav55_ermaugment_seed1/camelyon17_seed:1_epoch:best_model.pth", out_dim, prefix='model.0.', device=device)
 
 models = [erm0, erm1, swav0, swav1]
 names = ["ERM-seed0", "ERM-seed1", "SWAV-seed0", "SWAV-seed1"]
@@ -55,6 +53,14 @@ for model, name in zip(models, names):
     ID_ece = eval_ece(ID_true, ID_logits)
     DS_ece = eval_ece(DS_true, DS_logits)
     
+    max_softmax_ood_detection1 = eval_ood(ood.detector.MaxSoftmax(model), [ID_dataset], [OD1_dataset], device, nbatches=nbatches)
+    max_softmax_ood_detection2 = eval_ood(ood.detector.MaxSoftmax(model), [ID_dataset], [OD2_dataset], device, nbatches=nbatches)
+    
+    energy_based_ood_detection1 = eval_ood(ood.detector.EnergyBased(model), [ID_dataset], [OD1_dataset], device, nbatches=nbatches)
+    energy_based_ood_detection2 = eval_ood(ood.detector.EnergyBased(model), [ID_dataset], [OD2_dataset], device, nbatches=nbatches)
+
+    #TODO: VIM, OpenMax, Etc.
+    
     outputs[name] = {'ID_true':ID_true, 
                      'ID_logits': ID_logits, 
                      'DS_true':DS_true, 
@@ -68,8 +74,14 @@ for model, name in zip(models, names):
                      'ID_advrob_acc':ID_advrob_acc,
                      'DS_advrob_acc':DS_advrob_acc,
                      'ID_ece':ID_ece,
-                     'DS_ece':DS_ece}
+                     'DS_ece':DS_ece,
+                     'max_softmax_ood_detection1':max_softmax_ood_detection1, 
+                     'max_softmax_ood_detection2':max_softmax_ood_detection2,
+                     'energy_based_ood_detection1':energy_based_ood_detection1,
+                     'energy_based_ood_detection2':energy_based_ood_detection2}
 
+
+results
 #file = open('results', 'rb')
 #results = pickle.load(file)
 #file.close()

@@ -57,15 +57,24 @@ def eval_ece(y_true, model_logits):
     return torchmetrics.functional.calibration_error(model_logits.softmax(1), y_true).item()
 
 
-def eval_ood(detector, ID_datasets, OD_datasets, device=torch.device('cpu')):
+def eval_ood(detector, ID_datasets, OD_datasets, device=torch.device('cpu'), nbatches=None):
     metrics = ood.utils.OODMetrics()
+    
+    i=0
     for dataset in ID_datasets:
         for (x, y, md) in dataset:
+            i=i+1
             metrics.update(detector(x.to(device)), y)
-            
+            if nbatches is not None and i >= nbatches:
+                break
+         
+    i=0
     for dataset in OD_datasets:
         for (x, y, md) in dataset:
+            i=i+1
             metrics.update(detector(x.to(device)), -1 * torch.ones(x.shape[0]))
+            if nbatches is not None and i >= nbatches:
+                break
     
     return metrics.compute()
     

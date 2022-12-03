@@ -5,8 +5,10 @@ backcall==0.2.0
 certifi==2022.9.24
 charset-normalizer==2.1.1
 cycler==0.11.0
+Cython==0.29.32
 debugpy==1.5.1
 decorator==5.1.1
+docopt==0.6.2
 entrypoints==0.4
 executing==0.8.3
 filelock==3.8.0
@@ -20,6 +22,7 @@ joblib==1.2.0
 jupyter_client==7.3.5
 jupyter_core==4.11.1
 kiwisolver==1.4.2
+libmr==0.1.9
 littleutils==0.2.2
 matplotlib==3.5.3
 matplotlib-inline==0.1.6
@@ -35,6 +38,7 @@ pexpect==4.8.0
 pickleshare==0.7.5
 Pillow==9.3.0
 pip==22.2.2
+pipreqs==0.4.11
 prompt-toolkit==3.0.20
 psutil==5.9.0
 ptyprocess==0.7.0
@@ -42,6 +46,7 @@ pure-eval==0.2.2
 Pygments==2.11.2
 pyparsing==3.0.9
 python-dateutil==2.8.2
+pytorch-ood==0.0.14
 pytz==2022.6
 PyYAML==6.0
 pyzmq==23.2.0
@@ -56,6 +61,7 @@ threadpoolctl==3.1.0
 tokenizers==0.13.2
 torch==1.13.0
 torch-scatter==2.0.9
+torchmetrics==0.10.2
 torchvision==0.14.0
 tornado==6.2
 tqdm==4.64.1
@@ -66,3 +72,4 @@ urllib3==1.26.12
 wcwidth==0.2.5
 wheel==0.37.1
 wilds==2.0.0
+yarg==0.1.9
