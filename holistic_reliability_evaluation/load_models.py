@@ -22,4 +22,5 @@ def load_densenet121(path, d_out, wilds_save_format=True, device=torch.device('c
         state = newstate
     
     model.load_state_dict(state)
+    model.to(device).eval()
     return model

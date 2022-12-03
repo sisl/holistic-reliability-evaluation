@@ -3,17 +3,16 @@ import wilds.common.metrics.all_metrics
 import torch
 from autoattack import AutoAttack
 import torchmetrics
+import pytorch_ood as ood
 
 def predict_model(model, loader, nbatches=None, device=torch.device('cpu')):
-    model.to(device)
-    model.eval()
     y_true = []
     model_logits = []
     i=0
     for x, y, metadata in loader:
         pred = model(x.to(device))
-        model_logits.append(pred.detach().clone().to(torch.device('cpu')))
-        y_true.append(y.detach().clone().to(torch.device('cpu')))
+        model_logits.append(pred.detach().clone().cpu())
+        y_true.append(y.detach().clone().cpu())
         
         i=i+1
         if nbatches is not None and i >= nbatches:
@@ -56,5 +55,17 @@ def eval_adv_robust_accuracy(model, loader, device=torch.device('cpu')):
 
 def eval_ece(y_true, model_logits):
     return torchmetrics.functional.calibration_error(model_logits.softmax(1), y_true).item()
+
+
+def eval_ood(detector, ID_datasets, OD_datasets, device=torch.device('cpu')):
+    metrics = ood.utils.OODMetrics()
+    for dataset in ID_datasets:
+        for (x, y, md) in dataset:
+            metrics.update(detector(x.to(device)), y)
+            
+    for dataset in OD_datasets:
+        for (x, y, md) in dataset:
+            metrics.update(detector(x.to(device)), -1 * torch.ones(x.shape[0]))
     
+    return metrics.compute()
     

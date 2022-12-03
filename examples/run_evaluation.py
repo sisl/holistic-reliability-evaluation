@@ -1,24 +1,24 @@
 import torch
-import sys 
+import sys
 sys.path.append('/home/acorso/Workspace/holistic-reliability-evaluation/')
 import pickle
+import pytorch_ood as ood
 
 from holistic_reliability_evaluation.load_datasets import load_wilds_dataset, random_noise_dataset
 from holistic_reliability_evaluation.load_models import load_densenet121
-from holistic_reliability_evaluation.eval_functions import eval_accuracy, predict_model, eval_error_correlation, eval_adv_robust_accuracy, eval_ece
+from holistic_reliability_evaluation.eval_functions import eval_accuracy, predict_model, eval_error_correlation, eval_adv_robust_accuracy, eval_ece, eval_ood
 
 nbatches=1 # Set this to None if you want full evaluation
-shuffle_data=False
 nexamples_adv = 1 # Previously set to 250 for first round of experiments.
 
 data_dir = "data/"
-device = torch.device('mps')
+device = torch.device('cuda')
 out_dim = 2
 
 # Load Datasets
-ID_dataset = load_wilds_dataset("camelyon17", data_dir, split="id_val", shuffle=shuffle_data)
-DS_dataset = load_wilds_dataset("camelyon17", data_dir, split="test", shuffle=shuffle_data)
-OD1_dataset = load_wilds_dataset("rxrx1", data_dir, split="test", shuffle=shuffle_data, resize=(256, 256))
+ID_dataset = load_wilds_dataset("camelyon17", data_dir, split="id_val")
+DS_dataset = load_wilds_dataset("camelyon17", data_dir, split="test")
+OD1_dataset = load_wilds_dataset("rxrx1", data_dir, split="id_test")
 OD2_dataset = random_noise_dataset()
 
 # Datasets that are randomized (use for Adv robustness evaluation)
@@ -30,6 +30,8 @@ erm0 = load_densenet121("trained_models/camelyon17_erm_densenet121_seed0/best_mo
 erm1 = load_densenet121("trained_models/camelyon17_erm_densenet121_seed1/best_model.pth", out_dim)
 swav0 = load_densenet121("trained_models/camelyon17_swav55_ermaugment_seed0/camelyon17_seed:0_epoch:best_model.pth", out_dim, prefix='model.0.')
 swav1 = load_densenet121("trained_models/camelyon17_swav55_ermaugment_seed1/camelyon17_seed:1_epoch:best_model.pth", out_dim, prefix='model.0.')
+
+eval_ood(ood.detector.MaxSoftmax(erm0), [ID_dataset], [OD1_dataset], device)
 
 models = [erm0, erm1, swav0, swav1]
 names = ["ERM-seed0", "ERM-seed1", "SWAV-seed0", "SWAV-seed1"]
@@ -43,7 +45,6 @@ for model, name in zip(models, names):
     DS_true, DS_logits = predict_model(model, DS_dataset, nbatches=nbatches, device=device)
     OD1_true, OD1_logits = predict_model(model, OD1_dataset, nbatches=nbatches, device=device)
     OD2_true, OD2_logits = predict_model(model, OD2_dataset, nbatches=nbatches, device=device)
-    
     
     ID_accuracy = eval_accuracy(ID_true, ID_logits)
     DS_accuracy = eval_accuracy(DS_true, DS_logits)
