@@ -1,6 +1,6 @@
 import torch
 import sys
-sys.path.append('/Users/anthonycorso/Workspace/holistic-reliability-evaluation/')
+sys.path.append('/home/acorso/Workspace/holistic-reliability-evaluation/')
 import pickle
 import pytorch_ood as ood
 
@@ -8,18 +8,19 @@ from holistic_reliability_evaluation.load_datasets import load_wilds_dataset, ra
 from holistic_reliability_evaluation.load_models import load_densenet121
 from holistic_reliability_evaluation.eval_functions import eval_accuracy, predict_model, eval_error_correlation, eval_adv_robust_accuracy, eval_ece, eval_ood
 
-nbatches=1 # Set this to None if you want full evaluation
-nexamples_adv = 1 # Previously set to 250 for first round of experiments.
+nbatches=None # Set this to None if you want full evaluation
+nexamples_adv=256 # Previously set to 250 for first round of experiments.
+batch_size=64
 
 data_dir = "data/"
-device = torch.device('mps')
+device = torch.device('cuda:0')
 out_dim = 2
 
 # Load Datasets
-ID_dataset = load_wilds_dataset("camelyon17", data_dir, split="id_val")
-DS_dataset = load_wilds_dataset("camelyon17", data_dir, split="test")
-OD1_dataset = load_wilds_dataset("rxrx1", data_dir, split="id_test")
-OD2_dataset = random_noise_dataset()
+ID_dataset = load_wilds_dataset("camelyon17", data_dir, split="id_val", batch_size=batch_size)
+DS_dataset = load_wilds_dataset("camelyon17", data_dir, split="test", batch_size=batch_size)
+OD1_dataset = load_wilds_dataset("rxrx1", data_dir, split="id_test", batch_size=batch_size)
+OD2_dataset = random_noise_dataset(items=35000, batch_size=batch_size)
 
 # Datasets that are randomized (use for Adv robustness evaluation)
 ID_dataset_random = load_wilds_dataset("camelyon17", data_dir, split="id_val", shuffle=True, batch_size=nexamples_adv)

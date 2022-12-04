@@ -46,10 +46,10 @@ def eval_error_correlation(y1_true, model1_logits, y2_true, model2_logits):
     
 def eval_adv_robust_accuracy(model, loader, device=torch.device('cpu')):
     model.to(device)
-    adversary = AutoAttack(model, norm='Linf', eps=8/255, version='custom', device='cuda', attacks_to_run=['apgd-ce'])
+    adversary = AutoAttack(model, norm='Linf', eps=8/255, version='custom', device=device.type+":"+str(device.index), attacks_to_run=['apgd-ce'])
 
     input, y, md = next(iter(loader))
-    xadv, yadv = adversary.run_standard_evaluation(input.to(device), y.to(device), bs=input.size(0), return_labels=True)
+    xadv, yadv = adversary.run_standard_evaluation(input.to(device), y.to(device), bs=32, return_labels=True)
     return sum(y.to(device) == yadv).item() / y.size(0)
 
 

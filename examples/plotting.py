@@ -12,20 +12,36 @@ for name in results:
     print(name, " --> ", results[name])
 
 
-metrics = ['ID_accuracy', 'OD_accuracy', 'ID_advrob_acc', 'OD_advrob_acc', 'ID_ece', 'OD_ece']
+metrics = ['ID_accuracy', 'DS_accuracy', 'ID_advrob_acc', 'DS_advrob_acc', 'ID_ece', 'DS_ece', ]
 erm_models = ['ERM-seed0', 'ERM-seed1']
 swav_models = ['SWAV-seed0', 'SWAV-seed1']
 
 models_list = [erm_models, swav_models]
 model_names = ["ERM", "SWAV"]
 
+## Accuracy and robustness metrics
 for models, name in zip(models_list, model_names):
     print(name, end="")
     for m in metrics:
         t = torch.tensor([results[model][m] for model in models])
         print(" & ", round(t.mean().item(), 3), " (" + str(round(t.std().item(), 3)) + ")", end="")
     print("\\\\")
-    
+
+## OOD detection metrics
+ood_approaches = ["max_softmax", "energy_based"]
+ood_approaches_names = ["Max Softmax", "Energy-Based"]
+ood_datasets = ["ood_detection1", "ood_detection2"]
+ood_metrics = ["AUROC", "AUPR-IN", "AUPR-OUT", "ACC95TPR", "FPR95TPR"]
+for models, name in zip(models_list, model_names):
+    for approach, approach_name in zip(ood_approaches, ood_approaches_names):
+        print(name, " & ", approach_name, end="")
+        for dataset in ood_datasets:
+            key = approach + "_" + dataset
+            for ood_metric in ood_metrics:
+                t = torch.tensor([results[model][key][ood_metric] for model in models])
+                print(" & ", round(t.mean().item(), 3), " (" + str(round(t.std().item(), 3)) + ")", end="")
+        print("\\\\")
+
     
 ID_error_correlations = torch.stack([torch.tensor(results[m]['ID_correlations']) for m in erm_models + swav_models])
 OD_error_correlations = torch.stack([torch.tensor(results[m]['OD_correlations']) for m in erm_models + swav_models])
