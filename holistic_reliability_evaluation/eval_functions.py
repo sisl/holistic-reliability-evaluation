@@ -78,3 +78,29 @@ def eval_ood(detector, ID_datasets, OD_datasets, device=torch.device('cpu'), nba
     
     return metrics.compute()
     
+def conf_pred(labels, logits, cal_size, alpha):
+    #compute and divide softmax scores
+    smx = F.softmax(logits, dim=1).numpy()
+    idx = np.array([1] * cal_size + [0] * (smx.shape[0]-cal_size)) > 0
+    np.random.shuffle(idx)
+    cal_smx, val_smx = smx[idx,:], smx[~idx,:]
+    cal_labels, val_labels = labels[idx], labels[~idx]
+
+    # 1: get conformal scores. n = calib_Y.shape[0]
+    cal_scores = 1-cal_smx[np.arange(cal_size),cal_labels]
+
+    # 2: get adjusted quantile and predicction sets for softmax predictive sets
+    q_level = np.ceil((cal_size+1)*(1-alpha))/cal_size
+    qhat = np.quantile(cal_scores, q_level, interpolation='higher')
+    prediction_sets = (val_smx >= (1-qhat))*1
+
+    #3 get average set size
+    avg_ss=0
+    for set in prediction_sets:
+        a = np.sum(set)
+        avg_ss=avg_ss+a
+    avg_ss=avg_ss/(len(prediction_sets))
+
+    return avg_ss
+
+

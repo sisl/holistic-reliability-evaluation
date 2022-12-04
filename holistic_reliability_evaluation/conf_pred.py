@@ -4,17 +4,21 @@ import torch.nn.functional as F
 import sys 
 sys.path.append('/home/dk11/holistic-reliability-evaluation/')
 
-from holistic_reliability_evaluation.load_datasets import load_camelyon17_cal, load_camelyon17
+from holistic_reliability_evaluation.load_datasets import load_wilds_dataset
 from holistic_reliability_evaluation.load_models import load_densenet121
 from holistic_reliability_evaluation.eval_functions import predict_model
 
-nbatches=100 # Set this to None if you want full evaluation
+nbatches=2 # Set this to None if you want full evaluation
 shuffle_data=False
 nexamples_adv = 1 # Previously set to 250 for first round of experiments.
 
 data_dir = "/home/dk11/data/"
 device = torch.device('cuda')
 out_dim = 2
+
+torch.cuda.set_device(2)
+print(torch.cuda.current_device())
+
 
 # Load models
 erm0 = load_densenet121("/home/dk11/trained_models/camelyon17_erm_densenet121_seed0/best_model.pth", out_dim)
@@ -23,19 +27,19 @@ swav0 = load_densenet121("/home/dk11/trained_models/camelyon17_swav55_ermaugment
 swav1 = load_densenet121("/home/dk11/trained_models/camelyon17_swav55_ermaugment_seed1/camelyon17_seed:1_epoch:best_model.pth", out_dim, prefix='model.0.')
 
 #set parameters
-n=1000 #set to cal_size during full evaluation
-alpha = 0.4
+n=54 #set to cal_size during full evaluation
+alpha = 0.1
 
 #load data
-data = load_camelyon17(data_dir, split="test", shuffle=False, batch_size=32, pin_memory=True)
-labels, logits = predict_model(erm0, data, nbatches=nbatches, device=torch.device('cpu'))
+data = load_wilds_dataset("camelyon17", data_dir, split="test", shuffle=False, batch_size=32, pin_memory=True)
+labels, logits = predict_model(swav0, data, nbatches=nbatches, device=torch.device('cpu'))
 
-print(data.dataset[0])
-erm0(torch.zeros(1,3,96,96).cuda())
-erm0.classifier.bias
+##print(data.dataset[0])
+#erm0(torch.zeros(1,3,96,96).cuda())
+#erm0.classifier.bias
 
 print(logits.isnan().any())
-logits = torch.nan_to_num(logits)
+#logits = torch.nan_to_num(logits)
 
 #compute and divide softmax scores
 smx = F.softmax(logits, dim=1).numpy()
@@ -78,6 +82,8 @@ print(z)
 print(o)
 print(t)
 print(qhat)
+#print(val_smx)
+#print(prediction_sets)
 
 # Calculate empirical coverage
 empirical_coverage = prediction_sets[np.arange(prediction_sets.shape[0]),val_labels].mean()
@@ -88,12 +94,27 @@ print(f"The empirical coverage is: {empirical_coverage}")
 cal_pi = cal_smx.argsort(1)[:,::-1]; cal_srt = np.take_along_axis(cal_smx,cal_pi,axis=1).cumsum(axis=1) 
 cal_scores = np.take_along_axis(cal_srt,cal_pi.argsort(axis=1),axis=1)[range(n),cal_labels]
 
+#print(cal_smx)
+#print(cal_smx.argsort(1))
+#print(cal_smx.argsort(1)[:,::-1])
+#print(np.take_along_axis(cal_smx,cal_pi,axis=1))
+#print(np.take_along_axis(cal_smx,cal_pi,axis=1).cumsum(axis=1))
+#print(np.take_along_axis(cal_srt,cal_pi.argsort(axis=1),axis=1))
+#print(cal_scores)
+
 # Get the score quantile
 qhat = np.quantile(cal_scores, np.ceil((n+1)*(1-alpha))/n, interpolation='higher')
 
 # Deploy (output=list of length n, each element is tensor of classes)
 val_pi = val_smx.argsort(1)[:,::-1]; val_srt = np.take_along_axis(val_smx,val_pi,axis=1).cumsum(axis=1)
-prediction_sets = np.take_along_axis(val_srt <= qhat,val_pi.argsort(axis=1),axis=1)*1
+prediction_sets = (np.take_along_axis(val_srt <= qhat,val_pi.argsort(axis=1),axis=1))*1
+
+print(val_smx)
+print(val_smx.argsort(1))
+print(val_smx.argsort(1)[:,::-1])
+print(np.take_along_axis(val_smx,val_pi,axis=1))
+print(val_srt)
+print(prediction_sets)
 
 #3 get average set size
 i=0
@@ -120,6 +141,9 @@ print(z)
 print(o)
 print(t)
 print(qhat)
+#print(val_smx)
+#print(prediction_sets)
+
 
 # Calculate empirical coverage
 empirical_coverage = prediction_sets[np.arange(prediction_sets.shape[0]),val_labels].mean()
