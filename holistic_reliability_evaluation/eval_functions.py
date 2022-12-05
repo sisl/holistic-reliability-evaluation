@@ -3,6 +3,8 @@ import wilds.common.metrics.all_metrics
 import torch
 from autoattack import AutoAttack
 import torchmetrics
+import torch.nn.functional as F
+import numpy as np
 import pytorch_ood as ood
 
 def predict_model(model, loader, nbatches=None, device=torch.device('cpu')):

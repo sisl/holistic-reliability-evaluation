@@ -7,8 +7,9 @@ sys.path.append('/home/dk11/holistic-reliability-evaluation/')
 from holistic_reliability_evaluation.load_datasets import load_wilds_dataset
 from holistic_reliability_evaluation.load_models import load_densenet121
 from holistic_reliability_evaluation.eval_functions import predict_model
+from holistic_reliability_evaluation.eval_functions import conf_pred
 
-nbatches=2 # Set this to None if you want full evaluation
+nbatches=50 # Set this to None if you want full evaluation
 shuffle_data=False
 nexamples_adv = 1 # Previously set to 250 for first round of experiments.
 
@@ -27,7 +28,7 @@ swav0 = load_densenet121("/home/dk11/trained_models/camelyon17_swav55_ermaugment
 swav1 = load_densenet121("/home/dk11/trained_models/camelyon17_swav55_ermaugment_seed1/camelyon17_seed:1_epoch:best_model.pth", out_dim, prefix='model.0.')
 
 #set parameters
-n=54 #set to cal_size during full evaluation
+n=500 #set to cal_size during full evaluation
 alpha = 0.1
 
 #load data
@@ -109,12 +110,12 @@ qhat = np.quantile(cal_scores, np.ceil((n+1)*(1-alpha))/n, interpolation='higher
 val_pi = val_smx.argsort(1)[:,::-1]; val_srt = np.take_along_axis(val_smx,val_pi,axis=1).cumsum(axis=1)
 prediction_sets = (np.take_along_axis(val_srt <= qhat,val_pi.argsort(axis=1),axis=1))*1
 
-print(val_smx)
-print(val_smx.argsort(1))
-print(val_smx.argsort(1)[:,::-1])
-print(np.take_along_axis(val_smx,val_pi,axis=1))
-print(val_srt)
-print(prediction_sets)
+#print(val_smx)
+#print(val_smx.argsort(1))
+#print(val_smx.argsort(1)[:,::-1])
+#print(np.take_along_axis(val_smx,val_pi,axis=1))
+#print(val_srt)
+#print(prediction_sets)
 
 #3 get average set size
 i=0
@@ -148,3 +149,6 @@ print(qhat)
 # Calculate empirical coverage
 empirical_coverage = prediction_sets[np.arange(prediction_sets.shape[0]),val_labels].mean()
 print(f"The empirical coverage is: {empirical_coverage}")
+
+y = conf_pred(labels=labels, logits=logits, cal_size=n, alpha=0.1)
+print(y)
