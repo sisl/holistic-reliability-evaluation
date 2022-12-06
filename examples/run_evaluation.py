@@ -1,137 +1,100 @@
 import torch
-import sys
-sys.path.append('/home/acorso/Workspace/holistic-reliability-evaluation/')
 import pickle
-import pytorch_ood as ood
+import sys
+
+sys.path.append('/Users/anthonycorso/Workspace/augmentation-corruption/imagenet_c_bar')
+sys.path.append('/Users/anthonycorso/Workspace/augmentation-corruption/imagenet_c_bar/utils')
 
 from holistic_reliability_evaluation.load_datasets import load_wilds_dataset, random_noise_dataset
 from holistic_reliability_evaluation.load_models import load_densenet121
-from holistic_reliability_evaluation.eval_functions import eval_accuracy, predict_model, eval_error_correlation, eval_adv_robust_accuracy, eval_ece, eval_ood
-
-def check_mem():
-    t = torch.cuda.get_device_properties(0).total_memory
-    r = torch.cuda.memory_reserved(0)
-    a = torch.cuda.memory_allocated(0)
-    print("total: ", t, " reserved: ", r, " allocated: ", a)
-
-nbatches=2 # Set this to None if you want full evaluation
-nexamples_adv=256 # Previously set to 250 for first round of experiments.
+from holistic_reliability_evaluation.evaluation import Model, EvaluationSuite
 
 gradient_batch_size=32 # Batch sized used when also computing gradients
 nograd_batch_size=1024 # Batch size used when performing inference w/o gradient
+nexamples_adv=256 # Previously set to 250 for first round of experiments.
 
-data_dir = "../wilds/data/"
-device = torch.device('cuda:0')
+data_dir = "/Users/anthonycorso/Workspace/wilds/data/"
+model_dir = "/Users/anthonycorso/Workspace/holistic-reliability-evaluation/trained_models/"
+device = torch.device('cpu')
 out_dim = 2
 
-# Load Datasets
-ID_dataset = load_wilds_dataset("camelyon17", data_dir, split="id_val", batch_size=batch_size)
-DS_dataset = load_wilds_dataset("camelyon17", data_dir, split="test", batch_size=batch_size)
-OD1_dataset = load_wilds_dataset("rxrx1", data_dir, split="id_test", batch_size=batch_size)
-OD2_dataset = random_noise_dataset(items=35000, batch_size=batch_size)
-
-# Datasets that are randomized (use for Adv robustness evaluation)
-ID_dataset_random = load_wilds_dataset("camelyon17", data_dir, split="id_val", shuffle=True, batch_size=nexamples_adv)
-DS_dataset_random = load_wilds_dataset("camelyon17", data_dir, split="test", shuffle=True, batch_size=nexamples_adv)
+evaluator = EvaluationSuite(
+    { # In-distribution dataset
+        "ID": load_wilds_dataset("camelyon17", data_dir, split="id_val")
+    },
+    { # Domain shifted datastes
+        "Real World DS": load_wilds_dataset("camelyon17", data_dir, split="test"),
+        "C Bar (severity 1)":load_wilds_dataset("camelyon17", data_dir, split="id_val", corruption=1),
+        "C Bar (severity 5)":load_wilds_dataset("camelyon17", data_dir, split="id_val", corruption=5)
+    },
+    { # OOD Datsets
+        "RxRx1": load_wilds_dataset("rxrx1", data_dir, split="id_test"), 
+        "Gaussian Noise": random_noise_dataset(items=35000)
+    },
+    run_test=True,
+    adv_acc=False
+)
 
 # Load models
-erm0 = load_densenet121("trained_models/camelyon17_erm_densenet121_seed0/best_model.pth", out_dim, device=device)
-erm1 = load_densenet121("trained_models/camelyon17_erm_densenet121_seed1/best_model.pth", out_dim, device=device)
-swav0 = load_densenet121("trained_models/camelyon17_swav55_ermaugment_seed0/camelyon17_seed:0_epoch:best_model.pth", out_dim, prefix='model.0.', device=device)
-swav1 = load_densenet121("trained_models/camelyon17_swav55_ermaugment_seed1/camelyon17_seed:1_epoch:best_model.pth", out_dim, prefix='model.0.', device=device)
+erm0 = load_densenet121(f"{model_dir}/camelyon17_erm_densenet121_seed0/best_model.pth", out_dim, device=device)
+erm1 = load_densenet121(f"{model_dir}/camelyon17_erm_densenet121_seed1/best_model.pth", out_dim, device=device)
+swav0 = load_densenet121(f"{model_dir}/camelyon17_swav55_ermaugment_seed0/camelyon17_seed:0_epoch:best_model.pth", out_dim, prefix='model.0.', device=device)
+swav1 = load_densenet121(f"{model_dir}/camelyon17_swav55_ermaugment_seed1/camelyon17_seed:1_epoch:best_model.pth", out_dim, prefix='model.0.', device=device)
+
+model1 = Model(erm0)
+evaluator.evaluate(model1)
+
+# models = [Model(erm0), Model(erm1), Model(swav0), Model(swav1)]
+
+# for model in models:
+#     evaluator.evaluate(model)
 
 
-models = [erm0, erm1, swav0, swav1]
-names = ["ERM-seed0", "ERM-seed1", "SWAV-seed0", "SWAV-seed1"]
+# models = [erm0, erm1, swav0, swav1]
+# names = ["ERM-seed0", "ERM-seed1", "SWAV-seed0", "SWAV-seed1"]
 
-# Compute model outputs
-results = {}
-outputs = {}
-for model, name in zip(models, names):
-    print('solving: ', name)
-    ID_true, ID_logits = predict_model(model, ID_dataset, nbatches=nbatches, device=device)
-    DS_true, DS_logits = predict_model(model, DS_dataset, nbatches=nbatches, device=device)
-    OD1_true, OD1_logits = predict_model(model, OD1_dataset, nbatches=nbatches, device=device)
-    OD2_true, OD2_logits = predict_model(model, OD2_dataset, nbatches=nbatches, device=device)
 
-    ID_accuracy = eval_accuracy(ID_true, ID_logits)
-    DS_accuracy = eval_accuracy(DS_true, DS_logits)
+
+
+# #file = open('results', 'rb')
+# #results = pickle.load(file)
+# #file.close()
+
+# #file = open('outputs', 'rb')
+# #outputs = pickle.load(file)
+# #file.close()
+
+# # Evaluate the error correlations
+# for name in outputs:
+#     ID_true, ID_logits = outputs[name]['ID_true'], outputs[name]['ID_logits']
+#     DS_true, DS_logits = outputs[name]['DS_true'], outputs[name]['DS_logits']
     
-    ID_advrob_acc = 0 #eval_adv_robust_accuracy(model, ID_dataset_random, device=device)
-    DS_advrob_acc = 0 #eval_adv_robust_accuracy(model, DS_dataset_random, device=device)
+#     ID_accuracy = eval_accuracy(ID_true, ID_logits)
+#     DS_accuracy = eval_accuracy(DS_true, DS_logits)
     
-    ID_ece = eval_ece(ID_true, ID_logits)
-    DS_ece = eval_ece(DS_true, DS_logits)
+#     results[name]['ID_accuracy'] = ID_accuracy
+#     results[name]['DS_accuracy'] = DS_accuracy
+
+#     ID_correlations = []
+#     DS_correlations = []
+#     for name2 in outputs:
+#         ID_true2, ID_logits2 = outputs[name2]['ID_true'], outputs[name2]['ID_logits']
+#         DS_true2, DS_logits2 = outputs[name2]['DS_true'], outputs[name2]['DS_logits']
+#         ID_correlation = eval_error_correlation(ID_true, ID_logits, ID_true2, ID_logits2)
+#         DS_correlation = eval_error_correlation(DS_true, DS_logits, DS_true2, DS_logits2)
+#         ID_correlations.append(ID_correlation)
+#         DS_correlations.append(DS_correlation)
+#     results[name]['ID_correlations'] = ID_correlations
+#     results[name]['DS_correlations'] = DS_correlations
     
-    max_softmax_ood_detection1 = eval_ood(ood.detector.MaxSoftmax(model), [ID_dataset], [OD1_dataset], device, nbatches=nbatches)
-    max_softmax_ood_detection2 = eval_ood(ood.detector.MaxSoftmax(model), [ID_dataset], [OD2_dataset], device, nbatches=nbatches)
-    
-    energy_based_ood_detection1 = eval_ood(ood.detector.EnergyBased(model), [ID_dataset], [OD1_dataset], device, nbatches=nbatches)
-    energy_based_ood_detection2 = eval_ood(ood.detector.EnergyBased(model), [ID_dataset], [OD2_dataset], device, nbatches=nbatches)
+# # pickle the results
+# file = open('outputs', 'wb')
+# pickle.dump(outputs, file)
+# file.close()
 
-    #TODO: VIM, OpenMax, Etc.
-    
-    outputs[name] = {'ID_true':ID_true, 
-                     'ID_logits': ID_logits, 
-                     'DS_true':DS_true, 
-                     'DS_logits':DS_logits,
-                     'OD1_true':OD1_true, 
-                     'OD1_logits':OD1_logits,
-                     'OD2_true':OD2_true, 
-                     'OD2_logits':OD2_logits}
-    results[name] = {'ID_accuracy':ID_accuracy,
-                     'DS_accuracy':DS_accuracy,
-                     'ID_advrob_acc':ID_advrob_acc,
-                     'DS_advrob_acc':DS_advrob_acc,
-                     'ID_ece':ID_ece,
-                     'DS_ece':DS_ece,
-                     'max_softmax_ood_detection1':max_softmax_ood_detection1, 
-                     'max_softmax_ood_detection2':max_softmax_ood_detection2,
-                     'energy_based_ood_detection1':energy_based_ood_detection1,
-                     'energy_based_ood_detection2':energy_based_ood_detection2}
+# file = open('results', 'wb')
+# pickle.dump(results, file)
+# file.close()
 
-
-
-results
-#file = open('results', 'rb')
-#results = pickle.load(file)
-#file.close()
-
-#file = open('outputs', 'rb')
-#outputs = pickle.load(file)
-#file.close()
-
-# Evaluate the error correlations
-for name in outputs:
-    ID_true, ID_logits = outputs[name]['ID_true'], outputs[name]['ID_logits']
-    DS_true, DS_logits = outputs[name]['DS_true'], outputs[name]['DS_logits']
-    
-    ID_accuracy = eval_accuracy(ID_true, ID_logits)
-    DS_accuracy = eval_accuracy(DS_true, DS_logits)
-    
-    results[name]['ID_accuracy'] = ID_accuracy
-    results[name]['DS_accuracy'] = DS_accuracy
-
-    ID_correlations = []
-    DS_correlations = []
-    for name2 in outputs:
-        ID_true2, ID_logits2 = outputs[name2]['ID_true'], outputs[name2]['ID_logits']
-        DS_true2, DS_logits2 = outputs[name2]['DS_true'], outputs[name2]['DS_logits']
-        ID_correlation = eval_error_correlation(ID_true, ID_logits, ID_true2, ID_logits2)
-        DS_correlation = eval_error_correlation(DS_true, DS_logits, DS_true2, DS_logits2)
-        ID_correlations.append(ID_correlation)
-        DS_correlations.append(DS_correlation)
-    results[name]['ID_correlations'] = ID_correlations
-    results[name]['DS_correlations'] = DS_correlations
-    
-# pickle the results
-file = open('outputs', 'wb')
-pickle.dump(outputs, file)
-file.close()
-
-file = open('results', 'wb')
-pickle.dump(results, file)
-file.close()
-
-for name in results:     
-    print(name, " --> ", results[name])
+# for name in results:     
+#     print(name, " --> ", results[name])
