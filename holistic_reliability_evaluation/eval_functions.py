@@ -7,14 +7,21 @@ import torch.nn.functional as F
 import numpy as np
 import pytorch_ood as ood
 
+def check_mem():
+    t = torch.cuda.get_device_properties(0).total_memory
+    r = torch.cuda.memory_reserved(0)
+    a = torch.cuda.memory_allocated(0)
+    print("total: ", t, " reserved: ", r, " allocated: ", a)
+
 def predict_model(model, loader, nbatches=None, device=torch.device('cpu')):
     y_true = []
     model_logits = []
     i=0
     for x, y, metadata in loader:
-        pred = model(x.to(device))
-        model_logits.append(pred.detach().clone().cpu())
-        y_true.append(y.detach().clone().cpu())
+        with torch.no_grad():
+            pred = model(x.to(device))
+            model_logits.append(pred.cpu())
+        y_true.append(y)
         
         i=i+1
         if nbatches is not None and i >= nbatches:
@@ -66,7 +73,8 @@ def eval_ood(detector, ID_datasets, OD_datasets, device=torch.device('cpu'), nba
     for dataset in ID_datasets:
         for (x, y, md) in dataset:
             i=i+1
-            metrics.update(detector(x.to(device)), y)
+            with torch.no_grad():
+                metrics.update(detector(x.to(device)), y)
             if nbatches is not None and i >= nbatches:
                 break
          
@@ -74,7 +82,8 @@ def eval_ood(detector, ID_datasets, OD_datasets, device=torch.device('cpu'), nba
     for dataset in OD_datasets:
         for (x, y, md) in dataset:
             i=i+1
-            metrics.update(detector(x.to(device)), -1 * torch.ones(x.shape[0]))
+            with torch.no_grad():
+                metrics.update(detector(x.to(device)), -1 * torch.ones(x.shape[0]))
             if nbatches is not None and i >= nbatches:
                 break
     

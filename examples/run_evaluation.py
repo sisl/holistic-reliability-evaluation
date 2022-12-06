@@ -8,11 +8,19 @@ from holistic_reliability_evaluation.load_datasets import load_wilds_dataset, ra
 from holistic_reliability_evaluation.load_models import load_densenet121
 from holistic_reliability_evaluation.eval_functions import eval_accuracy, predict_model, eval_error_correlation, eval_adv_robust_accuracy, eval_ece, eval_ood
 
-nbatches=None # Set this to None if you want full evaluation
-nexamples_adv=256 # Previously set to 250 for first round of experiments.
-batch_size=64
+def check_mem():
+    t = torch.cuda.get_device_properties(0).total_memory
+    r = torch.cuda.memory_reserved(0)
+    a = torch.cuda.memory_allocated(0)
+    print("total: ", t, " reserved: ", r, " allocated: ", a)
 
-data_dir = "data/"
+nbatches=2 # Set this to None if you want full evaluation
+nexamples_adv=256 # Previously set to 250 for first round of experiments.
+
+gradient_batch_size=32 # Batch sized used when also computing gradients
+nograd_batch_size=1024 # Batch size used when performing inference w/o gradient
+
+data_dir = "../wilds/data/"
 device = torch.device('cuda:0')
 out_dim = 2
 
@@ -32,6 +40,7 @@ erm1 = load_densenet121("trained_models/camelyon17_erm_densenet121_seed1/best_mo
 swav0 = load_densenet121("trained_models/camelyon17_swav55_ermaugment_seed0/camelyon17_seed:0_epoch:best_model.pth", out_dim, prefix='model.0.', device=device)
 swav1 = load_densenet121("trained_models/camelyon17_swav55_ermaugment_seed1/camelyon17_seed:1_epoch:best_model.pth", out_dim, prefix='model.0.', device=device)
 
+
 models = [erm0, erm1, swav0, swav1]
 names = ["ERM-seed0", "ERM-seed1", "SWAV-seed0", "SWAV-seed1"]
 
@@ -44,12 +53,12 @@ for model, name in zip(models, names):
     DS_true, DS_logits = predict_model(model, DS_dataset, nbatches=nbatches, device=device)
     OD1_true, OD1_logits = predict_model(model, OD1_dataset, nbatches=nbatches, device=device)
     OD2_true, OD2_logits = predict_model(model, OD2_dataset, nbatches=nbatches, device=device)
-    
+
     ID_accuracy = eval_accuracy(ID_true, ID_logits)
     DS_accuracy = eval_accuracy(DS_true, DS_logits)
     
-    ID_advrob_acc = eval_adv_robust_accuracy(model, ID_dataset_random, device=device)
-    DS_advrob_acc = eval_adv_robust_accuracy(model, DS_dataset_random, device=device)
+    ID_advrob_acc = 0 #eval_adv_robust_accuracy(model, ID_dataset_random, device=device)
+    DS_advrob_acc = 0 #eval_adv_robust_accuracy(model, DS_dataset_random, device=device)
     
     ID_ece = eval_ece(ID_true, ID_logits)
     DS_ece = eval_ece(DS_true, DS_logits)
@@ -80,6 +89,7 @@ for model, name in zip(models, names):
                      'max_softmax_ood_detection2':max_softmax_ood_detection2,
                      'energy_based_ood_detection1':energy_based_ood_detection1,
                      'energy_based_ood_detection2':energy_based_ood_detection2}
+
 
 
 results
