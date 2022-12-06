@@ -7,7 +7,7 @@ sys.path.append('/home/dk11/holistic-reliability-evaluation/')
 from holistic_reliability_evaluation.load_datasets import load_wilds_dataset
 from holistic_reliability_evaluation.load_models import load_densenet121
 from holistic_reliability_evaluation.eval_functions import predict_model
-from holistic_reliability_evaluation.eval_functions import conf_pred
+from holistic_reliability_evaluation.eval_functions import conf_pred_acc_smx, conf_pred_pure_smx
 
 nbatches=50 # Set this to None if you want full evaluation
 shuffle_data=False
@@ -29,11 +29,11 @@ swav1 = load_densenet121("/home/dk11/trained_models/camelyon17_swav55_ermaugment
 
 #set parameters
 n=500 #set to cal_size during full evaluation
-alpha = 0.1
+alpha = 0.4
 
 #load data
 data = load_wilds_dataset("camelyon17", data_dir, split="test", shuffle=False, batch_size=32, pin_memory=True)
-labels, logits = predict_model(swav0, data, nbatches=nbatches, device=torch.device('cpu'))
+labels, logits = predict_model(erm0, data, nbatches=nbatches, device=torch.device('cpu'))
 
 ##print(data.dataset[0])
 #erm0(torch.zeros(1,3,96,96).cuda())
@@ -107,14 +107,25 @@ cal_scores = np.take_along_axis(cal_srt,cal_pi.argsort(axis=1),axis=1)[range(n),
 qhat = np.quantile(cal_scores, np.ceil((n+1)*(1-alpha))/n, interpolation='higher')
 
 # Deploy (output=list of length n, each element is tensor of classes)
-val_pi = val_smx.argsort(1)[:,::-1]; val_srt = np.take_along_axis(val_smx,val_pi,axis=1).cumsum(axis=1)
-prediction_sets = (np.take_along_axis(val_srt <= qhat,val_pi.argsort(axis=1),axis=1))*1
+val_pi = val_smx.argsort(1)[:,::-1]; 
+val_srt = np.take_along_axis(val_smx,val_pi,axis=1).cumsum(axis=1)
+
+q_hat = np.zeros(shape=(len(val_srt),2))
+for i in range(len(val_srt)):
+    a = min(list(filter(lambda x: x >= qhat, val_srt[i])), default=qhat)
+    q_hat[i,0]=a
+    q_hat[i,1]=a
+#print(q_hat)
+
+
+prediction_sets = (np.take_along_axis(val_srt <= q_hat,val_pi.argsort(axis=1),axis=1))*1
+
 
 #print(val_smx)
-#print(val_smx.argsort(1))
-#print(val_smx.argsort(1)[:,::-1])
-#print(np.take_along_axis(val_smx,val_pi,axis=1))
+#print(val_pi.argsort(axis=1))
 #print(val_srt)
+#print(q_hat)
+#print(val_srt <= q_hat)
 #print(prediction_sets)
 
 #3 get average set size
@@ -142,13 +153,14 @@ print(z)
 print(o)
 print(t)
 print(qhat)
-#print(val_smx)
-#print(prediction_sets)
 
 
 # Calculate empirical coverage
 empirical_coverage = prediction_sets[np.arange(prediction_sets.shape[0]),val_labels].mean()
 print(f"The empirical coverage is: {empirical_coverage}")
 
-y = conf_pred(labels=labels, logits=logits, cal_size=n, alpha=0.1)
+y = conf_pred_pure_smx(labels=labels, logits=logits, cal_size=n, alpha=0.4)
+print(y)
+
+y = conf_pred_acc_smx(labels=labels, logits=logits, cal_size=n, alpha=0.4)
 print(y)

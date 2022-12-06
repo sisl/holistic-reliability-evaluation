@@ -89,7 +89,7 @@ def eval_ood(detector, ID_datasets, OD_datasets, device=torch.device('cpu'), nba
     
     return metrics.compute()
     
-def conf_pred(labels, logits, cal_size, alpha):
+def conf_pred_pure_smx(labels, logits, cal_size, alpha):
     #compute and divide softmax scores
     smx = F.softmax(logits, dim=1).numpy()
     idx = np.array([1] * cal_size + [0] * (smx.shape[0]-cal_size)) > 0
@@ -112,6 +112,38 @@ def conf_pred(labels, logits, cal_size, alpha):
         avg_ss=avg_ss+a
     avg_ss=avg_ss/(len(prediction_sets))
 
+    return avg_ss
+
+def conf_pred_acc_smx(labels, logits, cal_size, alpha):
+    #compute and divide softmax scores
+    smx = F.softmax(logits, dim=1).numpy()
+    idx = np.array([1] * cal_size + [0] * (smx.shape[0]-cal_size)) > 0
+    np.random.shuffle(idx)
+    cal_smx, val_smx = smx[idx,:], smx[~idx,:]
+    cal_labels, val_labels = labels[idx], labels[~idx]
+
+    #get conformal scores
+    cal_pi = cal_smx.argsort(1)[:,::-1]; cal_srt = np.take_along_axis(cal_smx,cal_pi,axis=1).cumsum(axis=1) 
+    cal_scores = np.take_along_axis(cal_srt,cal_pi.argsort(axis=1),axis=1)[range(cal_size),cal_labels]
+
+    #get adjusted quantile and predicction sets for softmax predictive sets
+    qhat = np.quantile(cal_scores, np.ceil((cal_size+1)*(1-alpha))/cal_size, interpolation='higher')
+    val_pi = val_smx.argsort(1)[:,::-1]; 
+    val_srt = np.take_along_axis(val_smx,val_pi,axis=1).cumsum(axis=1)
+    q_hat = np.zeros(shape=(len(val_srt),2))
+    for i in range(len(val_srt)):
+        bound = min(list(filter(lambda x: x >= qhat, val_srt[i])), default=qhat)
+        q_hat[i,0]=bound
+        q_hat[i,1]=bound
+    prediction_sets = (np.take_along_axis(val_srt <= q_hat,val_pi.argsort(axis=1),axis=1))*1
+
+    #get average ss
+    avg_ss=0
+    for set in prediction_sets:
+        a = np.sum(set)
+        avg_ss=avg_ss+a
+    avg_ss=avg_ss/(len(prediction_sets))
+    
     return avg_ss
 
 
