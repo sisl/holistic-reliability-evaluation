@@ -1,21 +1,19 @@
 import torch
 import pickle
 import sys
+import random
 
-sys.path.append('/Users/anthonycorso/Workspace/augmentation-corruption/imagenet_c_bar')
-sys.path.append('/Users/anthonycorso/Workspace/augmentation-corruption/imagenet_c_bar/utils')
+sys.path.append('/home/anthonycorso/Workspace/augmentation-corruption/imagenet_c_bar')
+sys.path.append('/home/anthonycorso/Workspace/augmentation-corruption/imagenet_c_bar/utils')
 
 from holistic_reliability_evaluation.load_datasets import load_wilds_dataset, random_noise_dataset
-from holistic_reliability_evaluation.load_models import load_densenet121
-from holistic_reliability_evaluation.evaluation import Model, EvaluationSuite
+from holistic_reliability_evaluation.load_models import load_densenet121, load_featurized_densenet121
+from holistic_reliability_evaluation.evaluation import ModelGroup, Model, EvaluationSuite
 
-gradient_batch_size=32 # Batch sized used when also computing gradients
-nograd_batch_size=1024 # Batch size used when performing inference w/o gradient
-nexamples_adv=256 # Previously set to 250 for first round of experiments.
-
-data_dir = "/Users/anthonycorso/Workspace/wilds/data/"
-model_dir = "/Users/anthonycorso/Workspace/holistic-reliability-evaluation/trained_models/"
-device = torch.device('cpu')
+data_dir = "/home/anthonycorso/Workspace/wilds/data/"
+model_dir = "/home/anthonycorso/Workspace/wilds/trained_models/"
+results_dir = "results/"
+device = torch.device('cuda')
 out_dim = 2
 
 evaluator = EvaluationSuite(
@@ -31,37 +29,47 @@ evaluator = EvaluationSuite(
         "RxRx1": load_wilds_dataset("rxrx1", data_dir, split="id_test"), 
         "Gaussian Noise": random_noise_dataset(items=35000)
     },
-    run_test=True,
-    adv_acc=False
+    run_test = False,
+    test_size = 2048,
 )
 
 # Load models
-erm0 = load_densenet121(f"{model_dir}/camelyon17_erm_densenet121_seed0/best_model.pth", out_dim, device=device)
-erm1 = load_densenet121(f"{model_dir}/camelyon17_erm_densenet121_seed1/best_model.pth", out_dim, device=device)
-swav0 = load_densenet121(f"{model_dir}/camelyon17_swav55_ermaugment_seed0/camelyon17_seed:0_epoch:best_model.pth", out_dim, prefix='model.0.', device=device)
-swav1 = load_densenet121(f"{model_dir}/camelyon17_swav55_ermaugment_seed1/camelyon17_seed:1_epoch:best_model.pth", out_dim, prefix='model.0.', device=device)
+Nseeds = 10
+erm_models = ModelGroup('ERM', Nseeds, lambda s : f"{model_dir}/wilds_v1.0/camelyon17_erm_densenet121_seed{s}/best_model.pth", load_densenet121, {'out_dim':out_dim})
+ermaugment_models = ModelGroup('ERM-Augment', Nseeds, lambda s : f"{model_dir}/wilds_v2.0/camelyon17_ermaugment_seed{s}/camelyon17_seed:{s}_epoch:best_model.pth", load_densenet121, {'out_dim':out_dim})
+coral_models = ModelGroup('deepCORAL', Nseeds, lambda s : f"{model_dir}/wilds_v1.0/camelyon17_deepCORAL_densenet121_seed{s}/best_model.pth", load_featurized_densenet121, {'out_dim':out_dim})
+dro_models = ModelGroup('groupDRO', Nseeds, lambda s : f"{model_dir}/wilds_v1.0/camelyon17_groupDRO_densenet121_seed{s}/best_model.pth", load_densenet121, {'out_dim':out_dim})
+irm_models = ModelGroup('IRM', Nseeds, lambda s : f"{model_dir}/wilds_v1.0/camelyon17_irm_densenet121_seed{s}/best_model.pth", load_densenet121, {'out_dim':out_dim})
+swav_models = ModelGroup('SwAV', 2, lambda s : f"{model_dir}/wilds_v2.0/camelyon17_swav55_ermaugment_seed{s}/camelyon17_seed:{s}_epoch:best_model.pth", load_densenet121, {'out_dim':out_dim, 'prefix':'model.0.'})
+fixmatch_models = ModelGroup('FixMatch', 2, lambda s : f"{model_dir}/wilds_v2.0/camelyon17_fixmatch_testunlabeled_seed{s}/camelyon17_seed:{s}_epoch:best_model.pth", load_densenet121, {'out_dim':out_dim, 'prefix':'model.0.'})
+pseudolabels_models = ModelGroup('PseudoLabels', 2, lambda s : f"{model_dir}/wilds_v2.0/camelyon17_pseudolabel_testunlabeled_seed{s}/camelyon17_seed:{s}_epoch:best_model.pth", load_densenet121, {'out_dim':out_dim})
 
-model1 = Model(erm0)
-evaluator.evaluate(model1)
 
-# models = [Model(erm0), Model(erm1), Model(swav0), Model(swav1)]
+models = [*erm_models.gen_models(), 
+          *ermaugment_models.gen_models(), 
+          *coral_models.gen_models(),
+          *dro_models.gen_models(),
+          *irm_models.gen_models(),
+          *swav_models.gen_models(),
+          *fixmatch_models.gen_models(),
+          *pseudolabels_models.gen_models()]
 
-# for model in models:
-#     evaluator.evaluate(model)
-
+random.shuffle(models)
+for model in models:
+    try:
+        evaluator.evaluate(model)
+        file = open(f'results/{model.name()}.pkl', 'wb')
+        pickle.dump(model, file)
+        file.close()
+    except:
+        print("Failed!")
 
 # models = [erm0, erm1, swav0, swav1]
 # names = ["ERM-seed0", "ERM-seed1", "SWAV-seed0", "SWAV-seed1"]
 
 
-
-
 # #file = open('results', 'rb')
 # #results = pickle.load(file)
-# #file.close()
-
-# #file = open('outputs', 'rb')
-# #outputs = pickle.load(file)
 # #file.close()
 
 # # Evaluate the error correlations

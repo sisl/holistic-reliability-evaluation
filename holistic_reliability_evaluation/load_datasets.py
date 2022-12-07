@@ -21,8 +21,9 @@ def standardize(x: torch.Tensor) -> torch.Tensor:
     std[std == 0.] = 1.
     return TF.normalize(x, mean, std)
 
-def corruption_transforms(severity):
-    return [build_transform(name, severity, 'imagenet')  for name in set(transform_dict.keys()).difference({'color_balance'})]
+def corruption_transforms(severity, types):
+    return [build_transform(name, severity, 'imagenet')  for name in types]
+    # return [build_transform(name, severity, 'imagenet')  for name in set(transform_dict.keys()).difference({'color_balance'})]
 
 
 def load_wilds_dataset(dataset_name, 
@@ -30,14 +31,15 @@ def load_wilds_dataset(dataset_name,
                        split="test",
                        resize=(96,96),
                        normalization_transform = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                       corruption=None):
+                       corruption=None,
+                       corruption_types=['pseudocolor', 'single_frequency_greyscale', 'perspective_no_bars', 'lines', 'technicolor', 'chromatic_abberation', 'bleach_bypass', 'hue_shift', 'cocentric_sine_waves', 'transverse_chromatic_abberation', 'quadrilateral_no_bars']):
     dataset = wilds.get_dataset(dataset=dataset_name, root_dir=dir)
     
     # For adding coruption to the datasets
     extra_transforms = [] if corruption is None else [
         transforms.Resize(size=(224,224)),
         converters.PilToNumpy(),
-        transforms.RandomChoice(corruption_transforms(corruption)),
+        transforms.RandomChoice(corruption_transforms(corruption, corruption_types)),
         converters.NumpyToPil()
     ]
     
