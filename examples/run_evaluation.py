@@ -8,7 +8,7 @@ sys.path.append('/home/anthonycorso/Workspace/augmentation-corruption/imagenet_c
 
 from holistic_reliability_evaluation.load_datasets import load_wilds_dataset, random_noise_dataset
 from holistic_reliability_evaluation.load_models import load_densenet121, load_featurized_densenet121
-from holistic_reliability_evaluation.evaluation import ModelGroup, Model, EvaluationSuite
+from holistic_reliability_evaluation.evaluation import ModelGroup, Model, EvaluationSuite, ConformalPredictionParams
 
 data_dir = "/home/anthonycorso/Workspace/wilds/data/"
 model_dir = "/home/anthonycorso/Workspace/wilds/trained_models/"
@@ -29,8 +29,10 @@ evaluator = EvaluationSuite(
         "RxRx1": load_wilds_dataset("rxrx1", data_dir, split="id_test"), 
         "Gaussian Noise": random_noise_dataset(items=35000)
     },
-    run_test = False,
+    run_test = True,
     test_size = 2048,
+    num_adv_examples=32,
+    uq_metrics = ["ece", ConformalPredictionParams(100, 0.2, "Softmax"), ConformalPredictionParams(100, 0.2, "Acc. Softmax")]
 )
 
 # Load models

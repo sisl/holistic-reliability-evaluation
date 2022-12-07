@@ -256,15 +256,15 @@ class EvaluationSuite:
         self.num_adv_examples = num_adv_examples
         self.run_test = run_test
         self.verbose=verbose
+        self.test_size = test_size
+        self.test_seed = test_seed
         
         # Set other relevant params when running a test
-        if self.run_test:
-            self.num_adv_examples = 1
-            self.test_size = test_size
-            self.test_seed = test_seed
-            for uq_metric in self.uq_metrics:
-                if isinstance(uq_metric, ConformalPredictionParams):
-                    uq_metric.calibration_set_size=10
+        # if self.run_test:
+        #     self.num_adv_examples = 1
+        #     for uq_metric in self.uq_metrics:
+        #         if isinstance(uq_metric, ConformalPredictionParams):
+        #             uq_metric.calibration_set_size=10
 
     def evaluate(self, model):
         # Initializes the model and moves it to the correct device
