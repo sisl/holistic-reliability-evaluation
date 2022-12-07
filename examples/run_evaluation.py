@@ -35,14 +35,14 @@ evaluator = EvaluationSuite(
 
 # Load models
 Nseeds = 10
-erm_models = ModelGroup('ERM', Nseeds, lambda s : f"{model_dir}/wilds_v1.0/camelyon17_erm_densenet121_seed{s}/best_model.pth", load_densenet121, {'out_dim':out_dim})
-ermaugment_models = ModelGroup('ERM-Augment', Nseeds, lambda s : f"{model_dir}/wilds_v2.0/camelyon17_ermaugment_seed{s}/camelyon17_seed:{s}_epoch:best_model.pth", load_densenet121, {'out_dim':out_dim})
-coral_models = ModelGroup('deepCORAL', Nseeds, lambda s : f"{model_dir}/wilds_v1.0/camelyon17_deepCORAL_densenet121_seed{s}/best_model.pth", load_featurized_densenet121, {'out_dim':out_dim})
-dro_models = ModelGroup('groupDRO', Nseeds, lambda s : f"{model_dir}/wilds_v1.0/camelyon17_groupDRO_densenet121_seed{s}/best_model.pth", load_densenet121, {'out_dim':out_dim})
-irm_models = ModelGroup('IRM', Nseeds, lambda s : f"{model_dir}/wilds_v1.0/camelyon17_irm_densenet121_seed{s}/best_model.pth", load_densenet121, {'out_dim':out_dim})
-swav_models = ModelGroup('SwAV', 2, lambda s : f"{model_dir}/wilds_v2.0/camelyon17_swav55_ermaugment_seed{s}/camelyon17_seed:{s}_epoch:best_model.pth", load_densenet121, {'out_dim':out_dim, 'prefix':'model.0.'})
-fixmatch_models = ModelGroup('FixMatch', 2, lambda s : f"{model_dir}/wilds_v2.0/camelyon17_fixmatch_testunlabeled_seed{s}/camelyon17_seed:{s}_epoch:best_model.pth", load_densenet121, {'out_dim':out_dim, 'prefix':'model.0.'})
-pseudolabels_models = ModelGroup('PseudoLabels', 2, lambda s : f"{model_dir}/wilds_v2.0/camelyon17_pseudolabel_testunlabeled_seed{s}/camelyon17_seed:{s}_epoch:best_model.pth", load_densenet121, {'out_dim':out_dim})
+erm_models = ModelGroup('ERM', Nseeds, lambda s : f"{model_dir}/wilds_v1.0/camelyon17_erm_densenet121_seed{s}/best_model.pth", load_densenet121, {'out_dim':out_dim}, device)
+ermaugment_models = ModelGroup('ERM-Augment', Nseeds, lambda s : f"{model_dir}/wilds_v2.0/camelyon17_ermaugment_seed{s}/camelyon17_seed:{s}_epoch:best_model.pth", load_densenet121, {'out_dim':out_dim}, device)
+coral_models = ModelGroup('deepCORAL', Nseeds, lambda s : f"{model_dir}/wilds_v1.0/camelyon17_deepCORAL_densenet121_seed{s}/best_model.pth", load_featurized_densenet121, {'out_dim':out_dim}, device)
+dro_models = ModelGroup('groupDRO', Nseeds, lambda s : f"{model_dir}/wilds_v1.0/camelyon17_groupDRO_densenet121_seed{s}/best_model.pth", load_densenet121, {'out_dim':out_dim},device)
+irm_models = ModelGroup('IRM', Nseeds, lambda s : f"{model_dir}/wilds_v1.0/camelyon17_irm_densenet121_seed{s}/best_model.pth", load_densenet121, {'out_dim':out_dim}, device)
+swav_models = ModelGroup('SwAV', 2, lambda s : f"{model_dir}/wilds_v2.0/camelyon17_swav55_ermaugment_seed{s}/camelyon17_seed:{s}_epoch:best_model.pth", load_densenet121, {'out_dim':out_dim, 'prefix':'model.0.'}, device)
+fixmatch_models = ModelGroup('FixMatch', 2, lambda s : f"{model_dir}/wilds_v2.0/camelyon17_fixmatch_testunlabeled_seed{s}/camelyon17_seed:{s}_epoch:best_model.pth", load_densenet121, {'out_dim':out_dim, 'prefix':'model.0.'}, device)
+pseudolabels_models = ModelGroup('PseudoLabels', 2, lambda s : f"{model_dir}/wilds_v2.0/camelyon17_pseudolabel_testunlabeled_seed{s}/camelyon17_seed:{s}_epoch:best_model.pth", load_densenet121, {'out_dim':out_dim}, device)
 
 
 models = [*erm_models.gen_models(), 
@@ -61,8 +61,9 @@ for model in models:
         file = open(f'results/{model.name()}.pkl', 'wb')
         pickle.dump(model, file)
         file.close()
-    except:
-        print("Failed!")
+    except Exception as e:
+        print("===============>>>>  Failed!", e)
+
 
 # models = [erm0, erm1, swav0, swav1]
 # names = ["ERM-seed0", "ERM-seed1", "SWAV-seed0", "SWAV-seed1"]

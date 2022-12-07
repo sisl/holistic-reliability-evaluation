@@ -99,7 +99,7 @@ class Model:
         adversary = AutoAttack(self.model, norm='Linf', eps=8/255, version='custom', device=self.device, attacks_to_run=['apgd-ce'])
 
         input, y, md = next(iter(loader))
-        xadv, yadv = adversary.run_standard_evaluation(input.to(self.device), y.to(self.device), bs=self.nograd_batchsize, return_labels=True)
+        xadv, yadv = adversary.run_standard_evaluation(input.to(self.device), y.to(self.device), bs=self.grad_batchsize, return_labels=True)
         adv_acc = sum(y == yadv.cpu()).item() / y.size(0)
         
         self.results[name]["Adversarial Accuracy"] = adv_acc
