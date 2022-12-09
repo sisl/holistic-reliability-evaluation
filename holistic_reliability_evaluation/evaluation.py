@@ -6,7 +6,9 @@ from torch.utils.data import DataLoader
 from autoattack import AutoAttack
 import pytorch_ood as ood
 import torch.nn.functional as F
-from .utils import *
+from wilds.common.metrics.all_metrics import multiclass_logits_to_pred
+import random
+
 
 # Returns the errors from the true labels and the predicted logits
 def get_errors(labels, logits):
@@ -212,8 +214,8 @@ class Model:
 
 # Function that computes the error correlations between two models for a given dataset       
 def eval_error_correlation(m1, m2, dataset):
-    errors1 = get_errors(m1.results[dataset].pred, m1.results[dataset].logits)
-    errors2 = get_errors(m2.results[dataset].pred, m2.results[dataset].logits)
+    errors1 = get_errors(m1.results[dataset]["labels"], m1.results[dataset]["logits"])
+    errors2 = get_errors(m2.results[dataset]["labels"], m2.results[dataset]["logits"])
     
     # Compute the correlaion coeff: https://math.stackexchange.com/questions/610443/finding-a-correlation-between-bernoulli-variables
     a = errors1.logical_and(errors2).float().mean()
@@ -260,11 +262,11 @@ class EvaluationSuite:
         self.test_seed = test_seed
         
         # Set other relevant params when running a test
-        # if self.run_test:
-        #     self.num_adv_examples = 1
-        #     for uq_metric in self.uq_metrics:
-        #         if isinstance(uq_metric, ConformalPredictionParams):
-        #             uq_metric.calibration_set_size=10
+        if self.run_test:
+            self.num_adv_examples = 1
+            for uq_metric in self.uq_metrics:
+                if isinstance(uq_metric, ConformalPredictionParams):
+                    uq_metric.calibration_set_size=10
 
     def evaluate(self, model):
         # Initializes the model and moves it to the correct device

@@ -1,4 +1,6 @@
 import numpy as np
+from .evaluation import *
+import matplotlib.pyplot as plt
 
 def report_stats(v, sigfigs=3):
     v = np.array(v)
@@ -53,7 +55,7 @@ class ResultsProcessor:
         grouped_models = self.group_models_by_type()
 
         
-        if len(keys_per_type):
+        if len(keys_per_type)>1:
             column_count = 2
             table = []
             headers = [f"\multicolumn{{{len(keys_per_type)}}}{{c}}{{Method}}", f"\multicolumn{{{len(keys_per_type)}}}{{c}}{{}}"]
@@ -99,10 +101,58 @@ class ResultsProcessor:
         self.build_table(['Accuracy', 'Adversarial Accuracy'])
     
     def uq_table(self):
-        self.build_table(["Expected Calibration Error", *self.metrics_that_contain("Set Size")])
+        self.build_table(["Expected Calibration Error", *self.metrics_that_contain("Set Size (Acc")])
     
     def ood_table(self):
         ood_metrics = ["AUROC", "AUPR-IN", "AUPR-OUT", "ACC95TPR", "FPR95TPR"]
+        # ood_metrics = ["AUROC", "FPR95TPR"]
         ood_detectors = ["Max Softmax", "Energy-Based"]
+        # ood_detectors = ["Energy-Based"]
         self.build_table(ood_metrics, ood_detectors)
+
+    def get_metrics(self, datasets, metric, approach=None, return_types=False):
+        grouped_models = self.group_models_by_type()
+        model_list = [x for v in grouped_models.values() for x in v]
+        metlist=[]
+        typelist=[]
+        for m in model_list:
+            for d in datasets:
+                typelist.append(m.type)
+                if approach is not None:
+                    metlist.append(m.results[d][approach][metric])
+                else:
+                    metlist.append(m.results[d][metric])
+        if return_types:
+            return metlist, typelist
+        else:
+            return metlist
+        
+    def plot_error_correlation(self, dataset, filepath=None, figsize=(18.5, 10.5)):
+        grouped_models = self.group_models_by_type()
+        model_list = [x for v in grouped_models.values() for x in v]
+        labels = [m.name() for m in model_list]
+
+        error_correlations = [[eval_error_correlation(m1, m2, dataset) for m1 in model_list] for m2 in model_list]
+        fig, ax = plt.subplots()
+        fig.set_size_inches(*figsize)
+        im = ax.imshow(error_correlations, vmin=0, vmax=1)
+        
+
+        # Show all ticks and label them with the respective list entries
+        ax.set_xticks(np.arange(len(labels)), labels=labels)
+        ax.set_yticks(np.arange(len(labels)), labels=labels)
+
+        cbar = ax.figure.colorbar(im, ax=ax)
+        cbar.ax.set_ylabel("Pearson Correlation", rotation=-90, va="bottom")
+
+        # Rotate the tick labels and set their alignment.
+        plt.setp(ax.get_xticklabels(), rotation=90, ha="right", rotation_mode="anchor")
+
+        ax.set_title(f"Error Correlations for Dataset {dataset}")
+        fig.tight_layout()
+        if filepath is None:
+            plt.show()
+        else:
+            plt.savefig(filepath)
+                
 
