@@ -1,9 +1,12 @@
 import os
 import pickle
+from scipy.stats import pearsonr
+import matplotlib.pyplot as plt
+import numpy as np
 
 from holistic_reliability_evaluation.results_processor import ResultsProcessor
 
-results_dir = "results_12_8/"
+results_dir = "results/"
 
 def load_model(dir, filename):
     file = open(dir + filename, 'rb')
@@ -12,15 +15,6 @@ def load_model(dir, filename):
     return model
 
 models = [load_model(results_dir, p) for p in os.listdir(results_dir)]
-
-models[3].results
-# models[3].results["ID"]["Accuracy"]
-
-# models[2].type
-
-# import numpy as np
-# v = np.array([0.8, 0.86])
-# v.mean()
 
 rp = ResultsProcessor(models)
 
@@ -42,18 +36,13 @@ rp = ResultsProcessor(models)
 
 
 # ##
-from scipy.stats import pearsonr
-import matplotlib.pyplot as plt
-import numpy as np
-
-
 # acc_datasets = ["ID", "Real World DS", "C Bar (severity 1)", "C Bar (severity 5)"]
 # acc_datasets_short = ["ID", "Real Shift", "Corrupt-1", "Corrupt-5"]
 # ood_datasets = ["RxRx1", "Gaussian Noise"]
 
 # ood_approach = "Energy-Based"
 # robustness_metrics = ["Accuracy", "Adversarial Accuracy"]
-# uq_metrics = ["Expected Calibration Error", "Avg. Set Size (Acc. Softmax, alpha=0.2)"]
+# uq_metrics = ["Expected Calibration Error", "Avg. Set Size (Acc. Softmax, alpha=0.1)"]
 # uq_metrics_short = ["ECE", "Set Size"]
 # ood_metrics = ["AUROC", "FPR95TPR"]
 
