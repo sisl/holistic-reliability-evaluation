@@ -4,35 +4,61 @@ import torch.nn.functional as F
 import sys 
 sys.path.append('/home/dk11/holistic-reliability-evaluation/')
 
-from holistic_reliability_evaluation.load_datasets import load_wilds_dataset
-from holistic_reliability_evaluation.load_models import load_densenet121
-from holistic_reliability_evaluation.eval_functions import predict_model
-from holistic_reliability_evaluation.eval_functions import conf_pred_acc_smx, conf_pred_pure_smx
+sys.path.append('/home/dk11/augmentation-corruption/imagenet_c_bar')
+sys.path.append('/home/dk11/augmentation-corruption/imagenet_c_bar/utils')
 
-nbatches=50 # Set this to None if you want full evaluation
+from holistic_reliability_evaluation.load_datasets import load_wilds_dataset
+from holistic_reliability_evaluation.load_models import load_resnet50
+#from holistic_reliability_evaluation.evaluation import predict
+#from holistic_reliability_evaluation.evaluation import conf_pred_acc_smx, conf_pred_pure_smx
+
+nbatches=20 # Set this to None if you want full evaluation
 shuffle_data=False
-nexamples_adv = 1 # Previously set to 250 for first round of experiments.
+#nexamples_adv = 1 # Previously set to 250 for first round of experiments.
 
 data_dir = "/home/dk11/data/"
 device = torch.device('cuda')
-out_dim = 2
+out_dim = 182
 
-torch.cuda.set_device(2)
-print(torch.cuda.current_device())
+torch.cuda.set_device(0)
+print(torch.cuda.get_device_name(0))
 
+#predict model
+def predict_model(self, dataset, name):
+        loader = DataLoader(dataset, batch_size=self.nograd_batchsize, pin_memory=True)
+        labels = []
+        logits = []
+        i = 0
+        total = 0
+        for x, y, metadata in loader:
+            print("iteration: ", i, " total examples: ", total)
+            with torch.no_grad():
+                pred = self.model(x.to(self.device))
+                logits.append(pred.cpu())
+            labels.append(y)
+            i += 1
+            total += len(y)
+        
+        labels = torch.cat(labels)
+        logits = torch.cat(logits)
+        
+        self.results[name]["labels"] = labels
+        self.results[name]["logits"] = logits 
+        return labels, logits
+    
 
 # Load models
-erm0 = load_densenet121("/home/dk11/trained_models/camelyon17_erm_densenet121_seed0/best_model.pth", out_dim)
-erm1 = load_densenet121("/home/dk11/trained_models/camelyon17_erm_densenet121_seed1/best_model.pth", out_dim)
-swav0 = load_densenet121("/home/dk11/trained_models/camelyon17_swav55_ermaugment_seed0/camelyon17_seed:0_epoch:best_model.pth", out_dim, prefix='model.0.')
-swav1 = load_densenet121("/home/dk11/trained_models/camelyon17_swav55_ermaugment_seed1/camelyon17_seed:1_epoch:best_model.pth", out_dim, prefix='model.0.')
+erm0 = load_resnet50("/home/dk11/iwild_trained_models/iwildcam_erm_seed0/best_model.pth", out_dim)
+#erm1 = load_densenet121("/home/dk11/trained_models/camelyon17_erm_densenet121_seed1/best_model.pth", out_dim)
+#swav0 = load_densenet121("/home/dk11/trained_models/camelyon17_swav55_ermaugment_seed0/camelyon17_seed:0_epoch:best_model.pth", out_dim, prefix='model.0.')
+#swav1 = load_densenet121("/home/dk11/trained_models/camelyon17_swav55_ermaugment_seed1/camelyon17_seed:1_epoch:best_model.pth", out_dim, prefix='model.0.')
 
 #set parameters
 n=500 #set to cal_size during full evaluation
 alpha = 0.4
 
 #load data
-data = load_wilds_dataset("camelyon17", data_dir, split="test", shuffle=False, batch_size=32, pin_memory=True)
+data = load_wilds_dataset("iwildcam", data_dir, split="test", resize=(448,448))
 labels, logits = predict_model(erm0, data, nbatches=nbatches, device=torch.device('cpu'))
 
 ##print(data.dataset[0])
@@ -49,6 +75,7 @@ np.random.shuffle(idx)
 cal_smx, val_smx = smx[idx,:], smx[~idx,:]
 cal_labels, val_labels = labels[idx], labels[~idx]
 
+'''
 # 1: get conformal scores. n = calib_Y.shape[0]
 cal_scores = 1-cal_smx[np.arange(n),cal_labels]
 
@@ -89,7 +116,7 @@ print(qhat)
 # Calculate empirical coverage
 empirical_coverage = prediction_sets[np.arange(prediction_sets.shape[0]),val_labels].mean()
 print(f"The empirical coverage is: {empirical_coverage}")
-
+'''
 #generate adaptive prediction sets
 # Get scores. calib_X.shape[0] == calib_Y.shape[0] == n
 cal_pi = cal_smx.argsort(1)[:,::-1]; cal_srt = np.take_along_axis(cal_smx,cal_pi,axis=1).cumsum(axis=1) 

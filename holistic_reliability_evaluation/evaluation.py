@@ -196,11 +196,14 @@ class Model:
         qhat = np.quantile(cal_scores, np.ceil((cal_size+1)*(1-alpha))/cal_size, method='higher')
         val_pi = val_smx.argsort(1)[:,::-1]; 
         val_srt = np.take_along_axis(val_smx,val_pi,axis=1).cumsum(axis=1)
-        q_hat = np.zeros(shape=(len(val_srt),2))
+        q_hat = np.zeros(shape=(len(val_srt),np.shape(val_srt)[1]))
         for i in range(len(val_srt)):
             bound = min(list(filter(lambda x: x >= qhat, val_srt[i])), default=qhat)
-            q_hat[i,0]=bound
-            q_hat[i,1]=bound
+            for x in range(np.shape(val_srt)[1]):
+                q_hat[i,x]=bound
+            #q_hat[i,0]=bound
+            #q_hat[i,1]=bound
+        #print(np.shape(val_srt)[1])
         prediction_sets = (np.take_along_axis(val_srt <= q_hat,val_pi.argsort(axis=1),axis=1))*1
 
         #get average ss

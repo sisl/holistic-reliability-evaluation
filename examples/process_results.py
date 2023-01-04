@@ -1,8 +1,11 @@
 import os
 import pickle
 from scipy.stats import pearsonr
+import sys
 import matplotlib.pyplot as plt
 import numpy as np
+
+sys.path.append('/home/dk11/holistic-reliability-evaluation/')
 
 from holistic_reliability_evaluation.results_processor import ResultsProcessor
 
@@ -19,15 +22,15 @@ models = [load_model(results_dir, p) for p in os.listdir(results_dir)]
 rp = ResultsProcessor(models)
 
 ## Tabular results
-# rp.robustness_table()
+rp.robustness_table()
 
-# print("========")
+print("========")
 
-# rp.uq_table()
+rp.uq_table()
 
-# print("========")
+print("========")
 
-# rp.ood_table()
+rp.ood_table()
 
 ## Error correlations
 # rp.plot_error_correlation("ID", "id_err_corr.pdf")
