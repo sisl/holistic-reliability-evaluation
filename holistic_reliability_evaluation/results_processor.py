@@ -104,10 +104,10 @@ class ResultsProcessor:
         self.build_table(["Expected Calibration Error", *self.metrics_that_contain("Set Size (Acc")])
     
     def ood_table(self):
-        ood_metrics = ["AUROC", "AUPR-IN", "AUPR-OUT", "ACC95TPR", "FPR95TPR"]
-        # ood_metrics = ["AUROC", "FPR95TPR"]
-        ood_detectors = ["Max Softmax", "Energy-Based"]
-        # ood_detectors = ["Energy-Based"]
+        #ood_metrics = ["AUROC", "AUPR-IN", "AUPR-OUT", "ACC95TPR", "FPR95TPR"]
+        ood_metrics = ["AUROC", "FPR95TPR"]
+        #ood_detectors = ["Max Softmax", "Energy-Based"]
+        ood_detectors = ["Energy-Based"]
         self.build_table(ood_metrics, ood_detectors)
 
     def get_metrics(self, datasets, metric, approach=None, return_types=False):
@@ -132,6 +132,7 @@ class ResultsProcessor:
         model_list = [x for v in grouped_models.values() for x in v]
         labels = [m.name() for m in model_list]
 
+        #average blocks here
         error_correlations = [[eval_error_correlation(m1, m2, dataset) for m1 in model_list] for m2 in model_list]
         fig, ax = plt.subplots()
         fig.set_size_inches(*figsize)

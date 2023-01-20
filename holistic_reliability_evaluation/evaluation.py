@@ -160,7 +160,10 @@ class Model:
         smx = F.softmax(logits, dim=1).numpy()
         idx = np.array([1] * cal_size + [0] * (smx.shape[0]-cal_size)) > 0
         np.random.shuffle(idx)
+        print(idx.shape)
+        print(smx.shape)
         cal_smx, val_smx = smx[idx,:], smx[~idx,:]
+        print(val_smx.shape)
         cal_labels, val_labels = labels[idx], labels[~idx]
 
         # 1: get conformal scores. n = calib_Y.shape[0]
@@ -244,7 +247,7 @@ class EvaluationSuite:
                        ds_datasets,
                        ood_datasets,
                        adv_acc = True,
-                       uq_metrics = ["ece", ConformalPredictionParams(1000, 0.1, "Softmax"), ConformalPredictionParams(1000, 0.1, "Acc. Softmax")],
+                       uq_metrics = ["ece", ConformalPredictionParams(500, 0.1, "Softmax"), ConformalPredictionParams(500, 0.1, "Acc. Softmax")],
                        ood_detectors = ["Max Softmax", "Energy-Based"], 
                        num_adv_examples = 250, 
                        run_test=False,
@@ -265,11 +268,11 @@ class EvaluationSuite:
         self.test_seed = test_seed
         
         # Set other relevant params when running a test
-        if self.run_test:
-            self.num_adv_examples = 1
-            for uq_metric in self.uq_metrics:
-                if isinstance(uq_metric, ConformalPredictionParams):
-                    uq_metric.calibration_set_size=10
+        #if self.run_test:
+            #self.num_adv_examples = 1
+            #for uq_metric in self.uq_metrics:
+                #if isinstance(uq_metric, ConformalPredictionParams):
+                    #uq_metric.calibration_set_size=10
 
     def evaluate(self, model):
         # Initializes the model and moves it to the correct device

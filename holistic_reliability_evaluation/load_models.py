@@ -24,10 +24,10 @@ def load_resnet50(path, out_dim, wilds_save_format=True, prefix='model.'):
     model.load_state_dict(state)
     return model
     
-def load_featurized_resnet50(path, out_dim, featurizer_prefix='model.featurizer.', classifier_prefix='classifier.'):
+def load_featurized_resnet50(path, out_dim, featurizer_prefix='model.featurizer.', classifier_prefix='model.classifier.'):
     featurizer = torchvision.models.resnet50()
     featurizer_d_out = featurizer.fc.in_features
-    featurizer.classifier = nn.Identity(featurizer_d_out)
+    featurizer.fc = nn.Identity(featurizer_d_out)
 
     classifier = torch.nn.Linear(featurizer_d_out, out_dim)
 
@@ -44,6 +44,7 @@ def load_featurized_resnet50(path, out_dim, featurizer_prefix='model.featurizer.
 
 
     featurizer.load_state_dict(featurizer_state)
+    print("finished loading featurizer")
     classifier.load_state_dict(classifier_state)
     return nn.Sequential(featurizer, classifier)
 

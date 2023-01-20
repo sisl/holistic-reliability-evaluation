@@ -17,143 +17,191 @@ def load_model(dir, filename):
     file.close()
     return model
 
-models = [load_model(results_dir, p) for p in os.listdir(results_dir)]
+def make_plots(dataset, datasets1, datasets2, metric1, metric2, approach1, approach2):
+    models = [load_model(results_dir, p) for p in os.listdir(results_dir)]
+    rp = ResultsProcessor(models)
 
-rp = ResultsProcessor(models)
+    if dataset == "iWild":
+        elements = ['deepCORAL', 'groupDRO', 'ERM-Augment', 'SwAV', 'ERM', 'PseudoLabels', 'IRM', 'FixMatch', 'AFN', 'DEEPCORAL-COURSE', 'Noisy-Student', 'ERMORACLE', 'DANN-COURSE']
+        # The colors to use for each element
+        colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd", "#d62728", "#ffbb78", "#f781bf", "#aec7e8", "#DC143C", "#DAA520", "#556B2F", "#0000CD", "#696969"]
+    elif dataset == "Camelyon17":
+        elements = ['deepCORAL', 'groupDRO', 'ERM-Augment', 'SwAV', 'ERM', 'PseudoLabels', 'IRM', 'FixMatch', 'AFN', 'DEEPCORAL-COURSE', 'Noisy-Student', 'DANN-COURSE']
+        # The colors to use for each element
+        colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd", "#d62728", "#ffbb78", "#f781bf", "#aec7e8", "#DC143C", "#DAA520", "#556B2F", "#696969"]
+    ##create metrics and plots
+    m1, types1 = rp.get_metrics(datasets1, metric1, return_types=True, approach=approach1)
+    m2, types2 = rp.get_metrics(datasets2, metric2, return_types=True, approach=approach2)
 
-## Tabular results
-rp.robustness_table()
+    assert types1 == types2
 
-print("========")
+    element_colors = dict(zip(elements, colors))
+    types1 = np.array(types1)
+    m1 = np.array(m1)
+    m2 = np.array(m2)
 
-rp.uq_table()
+    #actual plotting, everything above sets up parameters to grab
+    for element in elements:
+        plt.scatter(m1[types1==element], m2[types1==element], c=element_colors[element], label=element)
+    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+    plt.tight_layout(pad=5)
+    plt.xlabel(metric1)
+    plt.ylabel(metric2)
 
-print("========")
+    if len(datasets1) == 1:
+        plt.title(metric2 + "(" + datasets2[0] + ") vs " + metric1+ "(" + datasets1[0] + ")")
+        plt.savefig(metric2 + "_" + datasets2[0] + "_vs_" + metric1 + "_" + datasets1[0] + ".png")
+    else:
+        plt.title(metric2 + " vs " + metric1)
+        plt.savefig(metric2 + "_vs_" + metric1 + ".png")
+    plt.clf()
 
-rp.ood_table()
+def process_results(dataset):
 
-## Error correlations
-# rp.plot_error_correlation("ID", "id_err_corr.pdf")
-# rp.plot_error_correlation("Real World DS", "ds_err_corr.pdf")
-# rp.plot_error_correlation("C Bar (severity 5)", "c5_err_corr.pdf")
+    models = [load_model(results_dir, p) for p in os.listdir(results_dir)]
+    rp = ResultsProcessor(models)
 
+    ## Tabular results
+    rp.robustness_table()
 
-# ##
-# acc_datasets = ["ID", "Real World DS", "C Bar (severity 1)", "C Bar (severity 5)"]
-# acc_datasets_short = ["ID", "Real Shift", "Corrupt-1", "Corrupt-5"]
-# ood_datasets = ["RxRx1", "Gaussian Noise"]
+    print("========")
 
-# ood_approach = "Energy-Based"
-# robustness_metrics = ["Accuracy", "Adversarial Accuracy"]
-# uq_metrics = ["Expected Calibration Error", "Avg. Set Size (Acc. Softmax, alpha=0.1)"]
-# uq_metrics_short = ["ECE", "Set Size"]
-# ood_metrics = ["AUROC", "FPR95TPR"]
+    rp.uq_table()
 
+    print("========")
 
-# names = []
-# vals = []
+    rp.ood_table()
 
-# for m in robustness_metrics:
-#     for (d, dshort) in zip(acc_datasets, acc_datasets_short):
-#         names.append(m + " - " + dshort)
-#         vals.append(rp.get_metrics([d], m))
-
-# for (m, mshort) in zip(uq_metrics, uq_metrics_short):
-#     for (d, dshort) in zip(acc_datasets, acc_datasets_short):
-#         names.append(mshort + " - " + dshort)
-#         vals.append(rp.get_metrics([d], m))
-
-# for m in ood_metrics:
-#     for d in ood_datasets:
-#         names.append(m + " - " + d)
-#         vals.append(rp.get_metrics([d], m, approach=ood_approach))
-
-# for (n,v) in zip(names, vals):
-#     print("name: ", n, " vals: ", v)
-
-# metric_correlations = [[pearsonr(x, y)[0] for x in vals] for y in vals]
-# metric_correlations
-# fig, ax = plt.subplots()
-# fig.set_size_inches(18.5, 10.5)
-# im = ax.imshow(metric_correlations, vmin=-1, vmax=1)
-
-
-# # Show all ticks and label them with the respective list entries
-# ax.set_xticks(np.arange(len(names)), labels=names)
-# ax.set_yticks(np.arange(len(names)), labels=names)
-
-# cbar = ax.figure.colorbar(im, ax=ax)
-# cbar.ax.set_ylabel("Pearson Correlation", rotation=-90, va="bottom")
-
-# # Rotate the tick labels and set their alignment.
-# plt.setp(ax.get_xticklabels(), rotation=90, ha="right", rotation_mode="anchor")
-
-# ax.set_title(f"Metric Correlations")
-# fig.tight_layout()
-# # plt.show()
-
-# plt.savefig("metric_correlations.pdf")
+    # Error correlations
+    rp.plot_error_correlation("ID", "id_err_corr.pdf")
+    rp.plot_error_correlation("Real World DS", "ds_err_corr.pdf")
+    rp.plot_error_correlation("C Bar (severity 5)", "c5_err_corr.pdf")
 
 
-## Plot some specific relationships
+    ## Metric correlations
+    acc_datasets = ["ID", "Real World DS", "C Bar (severity 1)", "C Bar (severity 5)"]
+    acc_datasets_short = ["ID", "Real Shift", "Corrupt-1", "Corrupt-5"]
+    ood_datasets = ["RxRx1", "Gaussian Noise"]
 
-# approach1=None
-# approach2=None
-# metric1 = "Accuracy"
-# metric2 = "Expected Calibration Error"
-
-# metric1 = "Accuracy"
-# metric2 = "Adversarial Accuracy"
-
-# datasets1 = ["ID", "Real World DS", "C Bar (severity 1)", "C Bar (severity 5)"]
-# datasets2 = ["ID", "Real World DS", "C Bar (severity 1)", "C Bar (severity 5)"]
-
-# metric1 = "Accuracy"
-# metric2 = "Accuracy"
-
-# datasets1 = ["ID"]#, "Real World DS", "C Bar (severity 1)", "C Bar (severity 5)"]
-# # datasets2 = ["Real World DS"]
-# # datasets2 = ["C Bar (severity 1)"]
-# datasets2 = ["C Bar (severity 5)"]
+    ood_approach = "Energy-Based"
+    robustness_metrics = ["Accuracy", "Adversarial Accuracy"]
+    uq_metrics = ["Expected Calibration Error", "Avg. Set Size (Acc. Softmax, alpha=0.2)"]
+    uq_metrics_short = ["ECE", "Set Size"]
+    ood_metrics = ["AUROC", "FPR95TPR"]
 
 
-metric1 = "Expected Calibration Error"
-metric2 = "AUROC"
-approach1=None
-approach2="Energy-Based"
+    names = []
+    vals = []
 
-# datasets1 = ["ID"]
-datasets1 = ["C Bar (severity 5)"]
-datasets2 = ["RxRx1"]
+    for m in robustness_metrics:
+        for (d, dshort) in zip(acc_datasets, acc_datasets_short):
+            names.append(m + " - " + dshort)
+            vals.append(rp.get_metrics([d], m))
+
+    for (m, mshort) in zip(uq_metrics, uq_metrics_short):
+        for (d, dshort) in zip(acc_datasets, acc_datasets_short):
+            names.append(mshort + " - " + dshort)
+            vals.append(rp.get_metrics([d], m))
+
+    for m in ood_metrics:
+        for d in ood_datasets:
+            names.append(m + " - " + d)
+            vals.append(rp.get_metrics([d], m, approach=ood_approach))
+
+    for (n,v) in zip(names, vals):
+        print("name: ", n, " vals: ", v)
+
+    metric_correlations = [[pearsonr(x, y)[0] for x in vals] for y in vals]
+    metric_correlations
+    fig, ax = plt.subplots()
+    fig.set_size_inches(18.5, 10.5)
+    im = ax.imshow(metric_correlations, vmin=-1, vmax=1)
 
 
-m1, types1 = rp.get_metrics(datasets1, metric1, return_types=True, approach=approach1)
-m2, types2 = rp.get_metrics(datasets2, metric2, return_types=True, approach=approach2)
+    # Show all ticks and label them with the respective list entries
+    ax.set_xticks(np.arange(len(names)), labels=names)
+    ax.set_yticks(np.arange(len(names)), labels=names)
 
-assert types1 == types2
+    cbar = ax.figure.colorbar(im, ax=ax)
+    cbar.ax.set_ylabel("Pearson Correlation", rotation=-90, va="bottom")
 
-elements = ['deepCORAL', 'groupDRO', 'ERM-Augment', 'SwAV', 'ERM', 'PseudoLabels', 'IRM', 'FixMatch']
+    # Rotate the tick labels and set their alignment.
+    plt.setp(ax.get_xticklabels(), rotation=90, ha="right", rotation_mode="anchor")
 
-# The colors to use for each element
-colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd", "#d62728", "#ffbb78", "#f781bf", "#aec7e8"]
+    ax.set_title(f"Metric Correlations")
+    fig.tight_layout()
+    #plt.show()
 
-element_colors = dict(zip(elements, colors))
-types1 = np.array(types1)
-m1 = np.array(m1)
-m2 = np.array(m2)
+    plt.savefig("metric_correlations.pdf")
+    plt.close()
 
+def comparison_plots(dataset):
+    ## Plot some specific relationships
+    approach1=None
+    approach2=None
+    metric1 = "Accuracy"
+    metric2 = "Accuracy"
+    datasets1 = ["ID"]#, "Real World DS", "C Bar (severity 1)", "C Bar (severity 5)"]
+    datasets2 = ["Real World DS"]
+    make_plots(dataset, datasets1, datasets2, metric1, metric2, approach1, approach2)
+    
 
-for element in elements:
-    plt.scatter(m1[types1==element], m2[types1==element], c=element_colors[element], label=element)
-plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
-plt.tight_layout(pad=5)
-plt.xlabel(metric1)
-plt.ylabel(metric2)
+    approach1=None
+    approach2=None
+    metric3 = "Accuracy"
+    metric4 = "Accuracy"
+    datasets3 = ["ID"]#, "Real World DS", "C Bar (severity 1)", "C Bar (severity 5)"]
+    datasets4 = ["C Bar (severity 1)"]
+    make_plots(dataset, datasets3, datasets4, metric3, metric4, approach1, approach2)
 
-if len(datasets1) == 1:
-    plt.title(metric2 + "(" + datasets2[0] + ") vs " + metric1+ "(" + datasets1[0] + ")")
-    plt.savefig(metric2 + "_" + datasets2[0] + "_vs_" + metric1 + "_" + datasets1[0] + ".png")
-else:
-    plt.title(metric2 + " vs " + metric1)
-    plt.savefig(metric2 + "_vs_" + metric1 + ".png")
+    approach1=None
+    approach2=None
+    metric1 = "Accuracy"
+    metric2 = "Accuracy"
+    datasets1 = ["ID"]#, "Real World DS", "C Bar (severity 1)", "C Bar (severity 5)"]
+    datasets2 = ["C Bar (severity 5)"]
+    make_plots(dataset, datasets1, datasets2, metric1, metric2, approach1, approach2)
 
+    approach1=None
+    approach2=None
+    metric1 = "Accuracy"
+    metric2 = "Expected Calibration Error"
+    datasets1 = ["ID", "Real World DS", "C Bar (severity 1)", "C Bar (severity 5)"]
+    datasets2 = ["ID", "Real World DS", "C Bar (severity 1)", "C Bar (severity 5)"]
+    make_plots(dataset, datasets1, datasets2, metric1, metric2, approach1, approach2)
+
+    approach1=None
+    approach2=None
+    metric1 = "Accuracy"
+    metric2 = "Adversarial Accuracy"
+    datasets1 = ["ID", "Real World DS", "C Bar (severity 1)", "C Bar (severity 5)"]
+    datasets2 = ["ID", "Real World DS", "C Bar (severity 1)", "C Bar (severity 5)"]
+    make_plots(dataset, datasets1, datasets2, metric1, metric2, approach1, approach2)
+
+    metric1 = "Expected Calibration Error"
+    metric2 = "AUROC"
+    approach1=None
+    approach2="Energy-Based"
+    datasets1 = ["ID"]
+    datasets2 = ["RxRx1"]
+    make_plots(dataset, datasets1, datasets2, metric1, metric2, approach1, approach2)
+
+    metric1 = "Expected Calibration Error"
+    metric2 = "AUROC"
+    approach1=None
+    approach2="Energy-Based"
+    datasets1 = ["Real World DS"]
+    datasets2 = ["RxRx1"]
+    make_plots(dataset, datasets1, datasets2, metric1, metric2, approach1, approach2)
+
+    metric1 = "Expected Calibration Error"
+    metric2 = "AUROC"
+    approach1=None
+    approach2="Energy-Based"
+    datasets1 = ["C Bar (severity 5)"]
+    datasets2 = ["RxRx1"]
+    make_plots(dataset, datasets1, datasets2, metric1, metric2, approach1, approach2)
+
+#process_results("Camelyon17")
+comparison_plots("Camelyon17")
+    
