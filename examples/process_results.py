@@ -9,7 +9,8 @@ sys.path.append('/home/dk11/holistic-reliability-evaluation/')
 
 from holistic_reliability_evaluation.results_processor import ResultsProcessor
 
-results_dir = "results/"
+results_dir = "iWild_results/"
+dataset_name = "iWildCam"
 
 def load_model(dir, filename):
     file = open(dir + filename, 'rb')
@@ -17,18 +18,67 @@ def load_model(dir, filename):
     file.close()
     return model
 
-def make_plots(dataset, datasets1, datasets2, metric1, metric2, approach1, approach2):
-    models = [load_model(results_dir, p) for p in os.listdir(results_dir)]
-    rp = ResultsProcessor(models)
+models = [load_model(results_dir, p) for p in os.listdir(results_dir)]
 
-    if dataset == "iWild":
-        elements = ['deepCORAL', 'groupDRO', 'ERM-Augment', 'SwAV', 'ERM', 'PseudoLabels', 'IRM', 'FixMatch', 'AFN', 'DEEPCORAL-COURSE', 'Noisy-Student', 'ERMORACLE', 'DANN-COURSE']
-        # The colors to use for each element
-        colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd", "#d62728", "#ffbb78", "#f781bf", "#aec7e8", "#DC143C", "#DAA520", "#556B2F", "#0000CD", "#696969"]
-    elif dataset == "Camelyon17":
-        elements = ['deepCORAL', 'groupDRO', 'ERM-Augment', 'SwAV', 'ERM', 'PseudoLabels', 'IRM', 'FixMatch', 'AFN', 'DEEPCORAL-COURSE', 'Noisy-Student', 'DANN-COURSE']
-        # The colors to use for each element
-        colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd", "#d62728", "#ffbb78", "#f781bf", "#aec7e8", "#DC143C", "#DAA520", "#556B2F", "#696969"]
+for m in models:
+    if m.type == 'DEEPCORAL-COURSE':
+        m.type = "deepCORAL w/ Unlabeled"
+    if m.type == 'DANN-COURSE':
+        m.type = "DANN"
+        
+elements = ['ERM', 'ERM-Augment', 'deepCORAL',  "deepCORAL w/ Unlabeled", 'IRM', 'groupDRO', 'DANN-COURSE', 'SwAV', 'PseudoLabels', 'FixMatch', 'AFN', 'Noisy-Student']
+colors = ['#2f4f4f', '#7f0000', '#008000', '#00008b', '#ff8c00', '#ffff00', '#00ff00', '#00ffff', '#ff00ff', '#1e90ff', '#f5deb3', '#ff69b4']
+
+
+rp = ResultsProcessor(models, elements)
+
+for m in models:
+    m.fill_hre()
+
+
+def HRE_Score_metrics():    
+    rp.metrics_table()
+
+
+    grouped_models = rp.group_models_by_type()
+    fig, ax = plt.subplots()
+
+    xi = 0
+    for type in grouped_models:
+        yvals = [m.results["HRE Score"] for m in grouped_models[type]]
+        xvals = [xi for m in grouped_models[type]]
+        ax.scatter(xvals, yvals, color=colors[xi])
+        xi = xi + 1
+    plt.xticks(ticks = range(len(grouped_models)), labels=[type for type in grouped_models], rotation = 90)
+    plt.ylabel("HRE Score")
+    plt.title(dataset_name)
+    fig.set_size_inches(6,6)
+    fig.tight_layout()
+    plt.savefig("HRE_Score_scatter.png")
+    
+def HRE_metrics_plot(m1, m2):
+    grouped_models = rp.group_models_by_type()
+    fig, ax = plt.subplots()
+
+    xi = 0
+    for type in grouped_models:
+        xvals = [m.results[m1] for m in grouped_models[type]]
+        yvals = [m.results[m2] for m in grouped_models[type]]
+        ax.scatter(xvals, yvals, color=colors[xi], label=type)
+        xi = xi + 1
+    plt.ylabel(m2)
+    plt.xlabel(m1)
+    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+    plt.title(m2 + " vs " + m1 + "(" + dataset_name + ")")
+    fig.set_size_inches(10,6)
+    fig.tight_layout()
+    plt.savefig(m2 + "_vs_" + m1 + ".png")
+    
+    
+
+##making plots and charts and tables
+def make_plots(dataset, datasets1, datasets2, metric1, metric2, approach1, approach2):
+    plt.clf()
     ##create metrics and plots
     m1, types1 = rp.get_metrics(datasets1, metric1, return_types=True, approach=approach1)
     m2, types2 = rp.get_metrics(datasets2, metric2, return_types=True, approach=approach2)
@@ -44,20 +94,23 @@ def make_plots(dataset, datasets1, datasets2, metric1, metric2, approach1, appro
     for element in elements:
         plt.scatter(m1[types1==element], m2[types1==element], c=element_colors[element], label=element)
     plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
-    plt.tight_layout(pad=5)
     plt.xlabel(metric1)
     plt.ylabel(metric2)
+    
+    plt.gcf().set_size_inches(12,8)
 
     if len(datasets1) == 1:
         plt.title(metric2 + "(" + datasets2[0] + ") vs " + metric1+ "(" + datasets1[0] + ")")
+        plt.tight_layout(pad=5)
         plt.savefig(metric2 + "_" + datasets2[0] + "_vs_" + metric1 + "_" + datasets1[0] + ".png")
     else:
         plt.title(metric2 + " vs " + metric1)
+        plt.tight_layout(pad=5)
         plt.savefig(metric2 + "_vs_" + metric1 + ".png")
     plt.clf()
 
 def process_results(dataset):
-
+    plt.clf()
     models = [load_model(results_dir, p) for p in os.listdir(results_dir)]
     rp = ResultsProcessor(models)
 
@@ -114,7 +167,7 @@ def process_results(dataset):
     metric_correlations = [[pearsonr(x, y)[0] for x in vals] for y in vals]
     metric_correlations
     fig, ax = plt.subplots()
-    fig.set_size_inches(18.5, 10.5)
+    fig.set_size_inches(10,10)
     im = ax.imshow(metric_correlations, vmin=-1, vmax=1)
 
 
@@ -202,6 +255,17 @@ def comparison_plots(dataset):
     datasets2 = ["RxRx1"]
     make_plots(dataset, datasets1, datasets2, metric1, metric2, approach1, approach2)
 
-#process_results("Camelyon17")
-comparison_plots("Camelyon17")
+
+
+# process_results(dataset_name)
+# comparison_plots(dataset_name)
+HRE_Score_metrics()
+
+HRE_metrics_plot("Accuracy", "Robustness")
+HRE_metrics_plot("Accuracy", "UQ")
+HRE_metrics_plot("Accuracy", "OOD Detection")
+HRE_metrics_plot("Robustness", "UQ")
+HRE_metrics_plot("Robustness", "OOD Detection")
+HRE_metrics_plot("UQ", "OOD Detection")
+
     

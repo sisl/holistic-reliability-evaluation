@@ -1,6 +1,7 @@
 import numpy as np
 from .evaluation import *
 import matplotlib.pyplot as plt
+from collections import OrderedDict
 
 def report_stats(v, sigfigs=3):
     v = np.array(v)
@@ -22,16 +23,19 @@ def print_table(column_count, headers, table_content):
     print("\\end{tabular}")
 
 class ResultsProcessor:
-    def __init__(self, models):
+    def __init__(self, models, type_order):
         self.models = models
+        self.type_order = type_order
 
     def group_models_by_type(self):
-        model_types = dict()
-        for m in self.models:
-            if m.type in model_types:
-                model_types[m.type].append(m)
-            else:
-                model_types[m.type] = [m]
+        model_types = OrderedDict()
+        for type in self.type_order:
+            for m in self.models:
+                if m.type == type:
+                    if m.type in model_types:
+                        model_types[m.type].append(m)
+                    else:
+                        model_types[m.type] = [m]
         return model_types
 
     def datasets_with_metric(self, metric):
@@ -97,6 +101,20 @@ class ResultsProcessor:
         print_table(column_count, headers, table)
 
 
+    def metrics_table(self):
+        header = "Method"
+        metrics = ["Accuracy", "Robustness", "Security", "UQ", "OOD Detection", "HRE Score"]
+        grouped_models = self.group_models_by_type()
+        table = [type for type in grouped_models]
+        for m in metrics:
+            header += " & " + m
+            i=0
+            for type in grouped_models:
+                t = [model.results[m] for model in grouped_models[type]]
+                table[i] += " & " + report_stats(t)
+                i+=1
+        print_table(len(metrics)+1, [header], table)
+        
     def robustness_table(self):
         self.build_table(['Accuracy', 'Adversarial Accuracy'])
     

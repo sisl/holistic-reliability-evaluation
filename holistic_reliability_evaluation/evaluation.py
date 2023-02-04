@@ -217,6 +217,49 @@ class Model:
         avg_ss=avg_ss/(len(prediction_sets))
         
         return avg_ss
+    
+    def fill_accuracy(self):
+        self.results["Accuracy"] = self.results["ID"]["Accuracy"]
+        
+    def fill_robustness(self, datasets=["Real World DS", "C Bar (severity 1)", "C Bar (severity 5)"]):
+        id_acc = self.results["ID"]["Accuracy"]
+        self.results["Robustness"] = np.mean([1 - (id_acc - self.results[d]["Accuracy"])/id_acc for d in datasets])
+
+    def fill_security(self, datasets=["ID", "Real World DS", "C Bar (severity 1)", "C Bar (severity 5)"]):
+        vals = []
+        for d in datasets:
+            acc = self.results[d]["Accuracy"]
+            adv_acc = self.results[d]["Adversarial Accuracy"]
+            vals.append(1 - (acc - adv_acc)/acc)
+        self.results["Security"] = np.mean(vals)
+
+    #average across all four datasets
+    def fill_uncertainty_q(self, datasets=["ID", "Real World DS", "C Bar (severity 1)", "C Bar (severity 5)"], metrics=["Expected Calibration Error"], normalization = [0.5]):
+        results = []
+        for (m, norm) in zip(metrics, normalization):
+            all_vals = []
+            for d in datasets:
+                all_vals.append(self.results[d][m])
+            results.append(np.mean(1- (np.array(all_vals) / norm)))
+        
+        self.results["UQ"]=np.mean(results)
+        
+    def fill_ood_detection(self, datasets=["RxRx1", "Gaussian Noise"]):
+        self.results["OOD Detection"] = np.mean([self.results[d]["Energy-Based"]["AUROC"] for d in datasets])
+
+    def fill_hre(self, uq_norms=[1,1]):
+        self.fill_accuracy()
+        self.fill_robustness()
+        self.fill_security()
+        self.fill_uncertainty_q(normalization=uq_norms)
+        self.fill_ood_detection()
+        
+        self.results["HRE Score"] = np.mean([self.results["Accuracy"],
+                                             self.results["Robustness"],
+                                            #  self.results["Security"],
+                                             self.results["UQ"],
+                                             self.results["OOD Detection"]])
+        
 
 # Function that computes the error correlations between two models for a given dataset       
 def eval_error_correlation(m1, m2, dataset):
