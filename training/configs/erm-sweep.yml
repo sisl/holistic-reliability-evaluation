@@ -1,0 +1,29 @@
+program: training/train.py
+method: random
+
+metric:
+  name: val_performance
+  goal: maximize
+
+early_terminate: 
+  type: hyperband
+  min_iter: 1
+
+parameters:
+  label_smoothing:
+    values: [0.1, 0.01, 0.0]
+  optimizer:
+    values: [adam, sgd, rmsprop, adagrad, adamw]
+  train_batch_size:
+    values: [32, 128, 512, 1024]
+  lr:
+    distribution: log_uniform_values
+    min: 1e-4
+    max: 1e-2 
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - training/configs/camelyon-defaults.yml
+  - ${args}
