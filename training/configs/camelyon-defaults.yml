@@ -1,6 +1,6 @@
 # Saving setup
 algorithm: erm
-phase: tune
+phase: train
 save_folder: results/
 
 # Training dataset information
@@ -9,7 +9,7 @@ n_classes: 2
 train_dataset: camelyon17-train
 
 # Parameters controlling resources
-num_workers: 32
+max_num_workers: 32
 accelerator: gpu
 devices: 1
 
@@ -35,6 +35,8 @@ test_ood_datasets:
 val_dataset_length: 1000
 val_batch_size: 1024
 test_dataset_length: 10000
+min_performance: 0.7
+max_performance: 1.0
 w_perf: 0.2
 w_rob: 0.2
 w_sec: 0.2

@@ -4,10 +4,12 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 from torchmetrics import Accuracy, CalibrationError
 import pytorch_ood as ood
+from autoattack import AutoAttack
 from torchvision.models import get_model
 
+import multiprocessing
 import sys, os
-sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
+sys.path.append(os.path.dirname(__file__))
 from load_datasets import load_dataset
 from hre_datasets import HREDatasets
 
@@ -77,7 +79,10 @@ class HREModel(pl.LightningModule):
             length=config["test_dataset_length"],
         )
 
-        # Set the HRE weights
+        # Set the HRE parameters and weights
+        self.min_performance = config["min_performance"]
+        self.max_performance = config["max_performance"]
+        
         total_weight = (
             config["w_perf"]
             + config["w_rob"]
@@ -92,7 +97,7 @@ class HREModel(pl.LightningModule):
         self.w_oodd = config["w_oodd"] / total_weight
 
         # Set up remaining configuration parameters
-        self.num_workers = config["num_workers"]
+        self.num_workers = min(multiprocessing.cpu_count(), config["max_num_workers"])
         self.val_batch_size = config["val_batch_size"]
         self.train_batch_size = config["train_batch_size"]
         self.optimizer = optimizer_options[config["optimizer"]]
@@ -164,7 +169,7 @@ class HREModel(pl.LightningModule):
         pred = self(x)
         return self.performance_metric(pred, y).item()
 
-    def security(self, batch):
+    def adversarial_performance(self, batch):
         raise NotImplementedError("Must be implemented by subclass")
 
     def calibration(self, batch):
@@ -177,17 +182,20 @@ class HREModel(pl.LightningModule):
         metrics.update(self.ood_detector(id_batch[0]), target)
         metrics.update(self.ood_detector(ood_batch[0]), -1 * target)
         ood_metrics = metrics.compute()
-        return ood_metrics["AUROC"]
+        auroc = ood_metrics["AUROC"]
+        return max(auroc, 1-auroc) # We could threshold in either direction, so we take the best outcome
 
     ## Thesese functions use the above functions to compute the HRE score
     def performance_info(self, id_batch, prefix):
-        return {prefix + "_performance": self.performance(id_batch)}
+        perf = self.performance(id_batch)
+        perf_norm = (perf - self.min_performance) / (self.max_performance - self.min_performance)
+        return {prefix + "_performance": perf, prefix + "_performance_norm": perf_norm}
 
     def robustness_info(self, ds_batches, id_performance, prefix, ds_names):
         results = {prefix + "_robustness": 0.0, prefix + "_ds_performance": 0.0}
         for name, batch in zip(ds_names, ds_batches):
             performance = self.performance(batch)
-            robustness = performance / id_performance
+            robustness = min(1.0, performance / id_performance)
             results[name + "_performance"] = performance
             results[name + "_robustness"] = robustness
             results[prefix + "_ds_performance"] += performance / len(ds_batches)
@@ -195,14 +203,11 @@ class HREModel(pl.LightningModule):
 
         return results
 
-    def security_info(self, id_batch, ds_batches, prefix, id_name, ds_names):
-        results = {prefix + "_security": 0.0}
-        for name, batch in zip([id_name, *ds_names], [id_batch, *ds_batches]):
-            security = self.security(batch)
-            results[name + "_security"] = security
-            results[prefix + "_security"] += security / (len(ds_batches) + 1)
-
-        return results
+    def security_info(self, id_batch, id_performance, prefix, id_name):
+        adv_performance = self.adversarial_performance(id_batch)
+        security = min(1.0, adv_performance / id_performance)
+        return {id_name + "_adv_performance": adv_performance,
+                prefix + "_security": security}
 
     def calibration_info(self, id_batch, ds_batches, prefix, id_name, ds_names):
         results = {prefix + "_calibration": 0.0}
@@ -229,7 +234,7 @@ class HREModel(pl.LightningModule):
             hrebatch["ds"], id_perf, prefix, ds_names
         )
         security_results = self.security_info(
-            hrebatch["id"], hrebatch["ds"], prefix, id_name, ds_names
+            hrebatch["id"], id_perf, prefix, id_name
         )
         calibration_results = self.calibration_info(
             hrebatch["id"], hrebatch["ds"], prefix, id_name, ds_names
@@ -238,7 +243,7 @@ class HREModel(pl.LightningModule):
             hrebatch["id"], hrebatch["ood"], prefix, ood_names
         )
         hre_score = (
-            id_perf * self.w_perf
+            performance_results[prefix + "_performance_norm"] * self.w_perf
             + robustness_results[prefix + "_robustness"] * self.w_rob
             + security_results[prefix + "_security"] * self.w_sec
             + calibration_results[prefix + "_calibration"] * self.w_cal
@@ -283,8 +288,22 @@ class ClassificationTask(HREModel):
         self.loss_fn = nn.CrossEntropyLoss(label_smoothing=config["label_smoothing"])
 
     # By default, we use a gradient based attack
-    def security(self, batch):
-        return 1.0  # TODO: Fill this in
+    def adversarial_performance(self, batch):
+        adversary = AutoAttack(self.model, device=self.device)
+        
+        # Set the target classes to not exceed the number of remaining classes
+        adversary.fab.n_target_classes = min(9, self.n_classes-1)
+        adversary.apgd_targeted.n_target_classes = min(9, self.n_classes-1)
+        
+        # The targets pgd attack uses a loss that is not compatible with less than 4 classes
+        if self.n_classes < 4:
+            adversary.attacks_to_run = ['apgd-ce', 'fab-t', 'square']
+
+        # Run the attack and get the results
+        xadv, yadv = adversary.run_standard_evaluation(batch[0], batch[1], return_labels=True)
+        adv_acc = sum(batch[1] == yadv).cpu().item() / batch[1].size(0)
+        return adv_acc
+
 
     # For classification we use ECE as the default calibration metric (and need to softmax it)
     def calibration(self, batch):
