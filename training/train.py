@@ -1,6 +1,7 @@
 import sys
 import os
 import yaml
+import argparse
 
 # Load pytorch lightning stuff for the trainer setup
 import pytorch_lightning as pl
@@ -22,8 +23,14 @@ def load_config(config_path):
             print(exc)
     return config
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--config")
+parser.add_argument("--seed", type=int, default=0)
+args = parser.parse_args()
+
 # Load all of the configs, later ones taking precendence over earlier ones. 
-config = load_config(sys.argv[1])
+config = load_config(args.config)
+config["seed"] = args.seed
 
 # Construct the save directories. 
 savedir = os.path.join(config["save_folder"], config["algorithm"], config["phase"])
