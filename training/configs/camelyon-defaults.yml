@@ -1,7 +1,7 @@
 # Saving setup
 algorithm: erm
 phase: train
-save_folder: results/
+save_folder: /home/acorso/results/
 
 # Training dataset information
 data_dir: /home/acorso/data/
@@ -14,9 +14,9 @@ accelerator: gpu
 devices: 1
 
 # Training params - (Many of these are likely going to be tuned)
-max_epochs: 1
+max_epochs: 15
 lr: 0.001
-train_batch_size: 512
+train_batch_size: 1024
 optimizer: adam
 model: densenet121
 label_smoothing: 0.0
@@ -25,11 +25,14 @@ label_smoothing: 0.0
 val_id_dataset: camelyon17-id_val
 val_ds_datasets:
   - camelyon17-val
+  - camelyon17-c1-val
 val_ood_datasets:
   - gaussian_noise-(96x96)
+  - rxrx1-id_test
 test_id_dataset: camelyon17-id_test
 test_ds_datasets:
   - camelyon17-test
+  - camelyon17-c1-test
 test_ood_datasets:
   - rxrx1-id_test
 val_dataset_length: 1000

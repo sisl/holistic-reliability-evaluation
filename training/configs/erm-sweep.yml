@@ -1,11 +1,11 @@
-program: training/train.py
+program: /home/acorso/Workspace/holistic-reliability-evaluation/training/train.py
 method: random
 
 metric:
   name: val_performance
   goal: maximize
 
-early_terminate: 
+early_terminate:
   type: hyperband
   min_iter: 1
 
@@ -21,11 +21,11 @@ parameters:
   lr:
     distribution: log_uniform_values
     min: 1e-4
-    max: 1e-2 
+    max: 1e-2
 
 command:
   - ${env}
   - ${interpreter}
   - ${program}
-  - training/configs/camelyon-defaults.yml
-  - ${args}
+  - --config
+  - /home/acorso/Workspace/holistic-reliability-evaluation/training/configs/camelyon-defaults.yml

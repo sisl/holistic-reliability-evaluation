@@ -33,13 +33,13 @@ config = load_config(args.config)
 config["seed"] = args.seed
 
 # Construct the save directories. 
-savedir = os.path.join(config["save_folder"], config["algorithm"], config["phase"])
+savedir = os.path.join(config["save_folder"], config["train_dataset"], config["algorithm"], config["phase"])
 if not os.path.exists(savedir):
     os.makedirs(savedir)
 
 # Build the logger
 logger = WandbLogger(
-        project=config["algorithm"],
+        project=config["train_dataset"],
         save_dir=savedir,
         )
 

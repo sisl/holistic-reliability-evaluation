@@ -437,7 +437,7 @@ def validation_corruptions(severity=1):
 def test_corruptions(severity=1):
     np.random.seed(0)
     corruptions = all_corruptions(severity)
-    p.random.shuffle(corruptions)
+    np.random.shuffle(corruptions)
     half = len(corruptions) // 2
     return corruptions[half:]
 

@@ -26,12 +26,12 @@ default_transforms = {
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ],
     "iwildcam": [
-        transforms.Resize(size=(-1, -1)),
+        transforms.Resize(size=(96, 96)),
         transforms.ToTensor(),
         transforms.Lambda(lambda x: standardize(x)),
     ],
     "rxrx1": [
-        transforms.Resize(size=(-1, -1)),
+        transforms.Resize(size=(96, 96)),
         transforms.ToTensor(),
         transforms.Lambda(lambda x: standardize(x)),
     ],
