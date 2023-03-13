@@ -82,7 +82,7 @@ class HREModel(pl.LightningModule):
         # Set the HRE parameters and weights
         self.min_performance = config["min_performance"]
         self.max_performance = config["max_performance"]
-        
+        self.num_adv = config["num_adv"]
         total_weight = (
             config["w_perf"]
             + config["w_rob"]
@@ -298,10 +298,14 @@ class ClassificationTask(HREModel):
         # The targets pgd attack uses a loss that is not compatible with less than 4 classes
         if self.n_classes < 4:
             adversary.attacks_to_run = ['apgd-ce', 'fab-t', 'square']
-
-        # Run the attack and get the results
-        xadv, yadv = adversary.run_standard_evaluation(batch[0], batch[1], return_labels=True)
-        adv_acc = sum(batch[1] == yadv).cpu().item() / batch[1].size(0)
+        
+        # Only use self.num_adv samples
+        x = batch[0][:self.num_adv, ...]
+        y = batch[1][:self.num_adv]
+        
+        # Run the attack and comput adversarial accuracy
+        _, yadv = adversary.run_standard_evaluation(x, y, return_labels=True)
+        adv_acc = sum(y == yadv).cpu().item() / y.size(0)
         return adv_acc
 
 

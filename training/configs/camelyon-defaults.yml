@@ -37,6 +37,7 @@ val_batch_size: 1024
 test_dataset_length: 10000
 min_performance: 0.7
 max_performance: 1.0
+num_adv: 100
 w_perf: 0.2
 w_rob: 0.2
 w_sec: 0.2
