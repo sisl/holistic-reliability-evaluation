@@ -25,11 +25,13 @@ def load_config(config_path):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config")
+parser.add_argument("--phase", default="train")
 parser.add_argument("--seed", type=int, default=0)
 args = parser.parse_args()
 
 # Load all of the configs, later ones taking precendence over earlier ones. 
 config = load_config(args.config)
+config["phase"] = args.phase
 config["seed"] = args.seed
 
 # Construct the save directories. 

@@ -233,6 +233,11 @@ def frost(x, severity=1):
     idx = np.random.randint(5)
     filename = ['frost1.png', 'frost2.png', 'frost3.png', 'frost4.jpg', 'frost5.jpg', 'frost6.jpg'][idx]
     frost = cv2.imread(os.path.join(os.path.dirname(__file__), filename))
+    
+    # In case we are dealing with images that are larger than the frost image, resize
+    new_size = (max(frost.shape[0], x.size[0]+1), max(frost.shape[1], x.size[1]+1))
+    frost = cv2.resize(frost, (new_size[1], new_size[0]))
+    
     # randomly crop and convert to rgb
     x_start, y_start = np.random.randint(0, frost.shape[0] - x.size[0]), np.random.randint(0, frost.shape[1] - x.size[1])
     frost = frost[x_start:x_start + x.size[0], y_start:y_start + x.size[1]][..., [2, 1, 0]]

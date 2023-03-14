@@ -1,5 +1,93 @@
 import random
-from torch.utils.data import Dataset, Subset
+import wilds
+import torch
+import torchvision.transforms as tfs
+import torchvision.transforms.functional as TF
+
+from torch.utils.data import random_split, Dataset, Subset
+
+import sys, os
+
+sys.path.append(os.path.dirname(__file__))
+from corruptions import validation_corruptions, test_corruptions
+
+# Function to standarize a tensor (0 mean and 1 std)
+def standardize_transform():
+    def standardize(x: torch.Tensor) -> torch.Tensor:
+        mean = x.mean(dim=(1, 2))
+        std = x.std(dim=(1, 2))
+        std[std == 0.0] = 1.0
+        return TF.normalize(x, mean, std)
+    return tfs.Lambda(lambda x: standardize(x))
+
+def random_rotation_transform(angles = [0, 90, 180, 270]):
+    def random_rotation(x: torch.Tensor) -> torch.Tensor:
+        angle = angles[torch.randint(low=0, high=len(angles), size=(1,))]
+        if angle > 0:
+            x = TF.rotate(x, angle)
+        return x
+    return tfs.Lambda(lambda x: random_rotation(x))
+
+transforms_dict = {
+    "wilds_default_normalization": tfs.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    "standardize": standardize_transform(),
+    "random_rotation": random_rotation_transform()
+}
+
+# Generate a dataset that is just gaussian random noise (pre-normalized)
+def random_noise_dataset(items, size, channels):
+    Xtrain = torch.randn(items, channels, *size)
+    ytrain = torch.randn(items, 1)
+    md = torch.randn(items, 1)
+    return torch.utils.data.TensorDataset(Xtrain, ytrain, md)
+
+# Load a wilds dataset and apply the appropriate transforms
+def load_wilds_dataset(
+    dataset_name,
+    dir,
+    split,
+    size,
+    transforms=[],
+    corruptions=[],
+):
+    dataset = wilds.get_dataset(dataset=dataset_name, root_dir=dir)
+    transform = tfs.Compose([tfs.Resize(size),
+                             *corruptions, 
+                             tfs.ToTensor(),
+                            *transforms])
+    return dataset.get_subset(split, transform=transform)
+
+# Parse the dataset name and load the appropriate dataset
+def load_dataset(data_dir, name, size, n_channels, transforms):
+    transforms = [transforms_dict[t] for t in transforms]
+    
+    split_words = name.split("-")
+    assert len(split_words) in [1, 2, 3]
+    
+    dataset_name = split_words[0]
+    if dataset_name == "gaussian_noise":
+        return random_noise_dataset(items=10000, size=size, channels=n_channels)
+    else:
+        split = split_words[1]
+        assert split in ["train", "val", "test", "id_val", "id_test"]
+        
+        corruptions = []
+        if len(split_words) == 3:
+            assert split_words[2] in ["corruption1_val", "corruption1_test"]
+            if split_words[2] == "corruption1_val":
+                corruptions=[tfs.RandomChoice(validation_corruptions(1))]
+            elif split_words[2] == "corruption1_test":
+                corruptions=[tfs.RandomChoice(test_corruptions(1))]
+            
+    # For some reason camelyon17 only has id_val and rxrx1 only has id_test
+    if dataset_name in ["camelyon17", "rxrx1"] and split in ["id_val", "id_test"]:
+        index = {"id_val" : 0, "id_test" : 1}[split]
+        split = {"camelyon17" : "id_val", "rxrx1" : "id_test"}[dataset_name]
+        dataset = load_wilds_dataset(dataset_name, data_dir, split, size, transforms, corruptions=corruptions)
+        return random_split(dataset, [0.5, 0.5], generator=torch.Generator().manual_seed(0))[index]
+    else:
+        return load_wilds_dataset(dataset_name, data_dir, split, size, transforms, corruptions=corruptions)
+
 
 # Get a subset of a provided dataset, possibly by first randomizing the indices
 def get_subset(dataset, length, randomize=True):

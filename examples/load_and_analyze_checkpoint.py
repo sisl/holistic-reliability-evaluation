@@ -1,6 +1,7 @@
 import torch
 from training.hre_model import ClassificationTask
 
+## Load a checkpoint
 checkpoint = "/home/acorso/results/erm/tune/erm/1yzjhqae/checkpoints/epoch=0-step=591.ckpt"
 model = ClassificationTask.load_from_checkpoint(checkpoint_path=checkpoint)
 
@@ -28,6 +29,25 @@ adv_acc
 ## Produce OOD plots
 import pytorch_ood as ood
 import matplotlib.pyplot as plt
+from training.hre_datasets import load_dataset
+from torch.utils.data import DataLoader
+import numpy as np
+
+dataset = load_dataset("/scratch/users/acorso/data", "iwildcam-train-corruption1_val", (448,448), 3, [])
+dataset = DataLoader(dataset, batch_size=1, shuffle=True)
+batch = next(iter(dataset))
+
+
+plt.imshow(dataset.dataset[1][0])
+
+plt.imshow(batch[0][0].permute(1,2,0))
+plt.savefig("test.png")
+
+
+#plot an image
+plt.imshow(batch[0].permute(1,2,0))
+plt.savefig("test.png")
+
 metrics = ood.utils.OODMetrics()
 
 id_batch = batch["id"]

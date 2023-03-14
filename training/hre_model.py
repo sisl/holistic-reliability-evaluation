@@ -10,8 +10,7 @@ from torchvision.models import get_model
 import multiprocessing
 import sys, os
 sys.path.append(os.path.dirname(__file__))
-from load_datasets import load_dataset
-from hre_datasets import HREDatasets
+from hre_datasets import HREDatasets, load_dataset
 
 # Set the precision to speed things up a bit
 torch.set_float32_matmul_precision("medium")
@@ -51,26 +50,30 @@ class HREModel(pl.LightningModule):
         data_dir = config["data_dir"]
 
         # Load the training datasets
-        self.train_dataset = load_dataset(data_dir, config["train_dataset"])
+        self.size = tuple(config["size"])
+        self.n_channels = config["n_channels"]
+        self.transforms = config["transforms"]
+        
+        self.train_dataset = load_dataset(data_dir, config["train_dataset"], self.size, self.n_channels, self.transforms)
 
         # Build the val and test datasets
-        val = load_dataset(data_dir, config["val_id_dataset"])
+        val = load_dataset(data_dir, config["val_id_dataset"], self.size, self.n_channels, self.transforms)
         val_ds_datasets = [
-            load_dataset(data_dir, name) for name in config["val_ds_datasets"]
+            load_dataset(data_dir, name, self.size, self.n_channels, self.transforms) for name in config["val_ds_datasets"]
         ]
         val_ood_datasets = [
-            load_dataset(data_dir, name) for name in config["val_ood_datasets"]
+            load_dataset(data_dir, name, self.size, self.n_channels, self.transforms) for name in config["val_ood_datasets"]
         ]
         self.val_datasets = HREDatasets(
             val, val_ds_datasets, val_ood_datasets, length=config["val_dataset_length"]
         )
 
-        test = load_dataset(data_dir, config["test_id_dataset"])
+        test = load_dataset(data_dir, config["test_id_dataset"], self.size, self.n_channels, self.transforms)
         test_ds_datasets = [
-            load_dataset(data_dir, name) for name in config["test_ds_datasets"]
+            load_dataset(data_dir, name, self.size, self.n_channels, self.transforms) for name in config["test_ds_datasets"]
         ]
         test_ood_datasets = [
-            load_dataset(data_dir, name) for name in config["test_ood_datasets"]
+            load_dataset(data_dir, name, self.size, self.n_channels, self.transforms) for name in config["test_ood_datasets"]
         ]
         self.test_datasets = HREDatasets(
             test,
@@ -176,11 +179,12 @@ class HREModel(pl.LightningModule):
         raise NotImplementedError("Must be implemented by subclass")
 
     # We use AUROC as the default OOD detection metric
-    def ood_detection(self, id_batch, ood_batch):
+    def ood_detection(self, id_batch, ood_batches):
         metrics = ood.utils.OODMetrics()
         target = torch.ones(id_batch[0].shape[0])
         metrics.update(self.ood_detector(id_batch[0]), target)
-        metrics.update(self.ood_detector(ood_batch[0]), -1 * target)
+        for ood_batch in ood_batches:
+            metrics.update(self.ood_detector(ood_batch[0]), -1 * target)
         ood_metrics = metrics.compute()
         auroc = ood_metrics["AUROC"]
         return max(auroc, 1-auroc) # We could threshold in either direction, so we take the best outcome
@@ -192,6 +196,8 @@ class HREModel(pl.LightningModule):
         return {prefix + "_performance": perf, prefix + "_performance_norm": perf_norm}
 
     def robustness_info(self, ds_batches, id_performance, prefix, ds_names):
+        if id_performance == 0:
+            id_performance = 1e-6
         results = {prefix + "_robustness": 0.0, prefix + "_ds_performance": 0.0}
         for name, batch in zip(ds_names, ds_batches):
             performance = self.performance(batch)
@@ -204,6 +210,9 @@ class HREModel(pl.LightningModule):
         return results
 
     def security_info(self, id_batch, id_performance, prefix, id_name):
+        if id_performance == 0:
+            id_performance = 1e-6
+            
         adv_performance = self.adversarial_performance(id_batch)
         security = min(1.0, adv_performance / id_performance)
         return {id_name + "_adv_performance": adv_performance,
@@ -219,11 +228,11 @@ class HREModel(pl.LightningModule):
         return results
 
     def ood_detection_info(self, id_batch, ood_batches, prefix, ood_names):
-        results = {prefix + "_ood_detection": 0.0}
-        for name, batch in zip(ood_names, ood_batches):
-            ood_detection = self.ood_detection(id_batch, batch)
-            results[name + "_ood_detection"] = ood_detection
-            results[prefix + "_ood_detection"] += ood_detection / len(ood_batches)
+        results = {prefix + "_ood_detection": self.ood_detection(id_batch, ood_batches)}
+        # for name, batch in zip(ood_names, ood_batches):
+        #     ood_detection = self.ood_detection(id_batch, batch)
+        #     results[name + "_ood_detection"] = ood_detection
+        #     results[prefix + "_ood_detection"] += ood_detection / len(ood_batches)
 
         return results
 

@@ -29,3 +29,5 @@ command:
   - ${program}
   - --config
   - /home/acorso/Workspace/holistic-reliability-evaluation/training/configs/camelyon-defaults.yml
+  - --phase
+  - tune
