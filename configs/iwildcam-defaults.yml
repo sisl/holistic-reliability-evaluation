@@ -9,7 +9,8 @@ n_classes: 182
 train_dataset: iwildcam-train
 size: [448, 448]
 n_channels: 3
-transforms: [wilds_default_normalization]
+train_transforms: []
+eval_transforms: [wilds_default_normalization]
 # These are for scaling the performance:
 min_performance: 0.
 max_performance: 1.0
@@ -26,6 +27,8 @@ train_batch_size: 32
 optimizer: adam
 model: resnet50
 label_smoothing: 0.0
+pretrained_weights: none
+train_last_k: 0
 
 # HRE setup
 val_id_dataset: iwildcam-id_val

@@ -1,0 +1,52 @@
+config:
+  accelerator: gpu
+  algorithm: groupDRO_9_deepCORAL_3_NoisyStudent-valunlabeled_3_deepCORAL-Coarse_2
+  data_dir: /scratch/users/acorso/data/
+  devices: 1
+  label_smoothing: 0.0
+  lr: 0.001
+  max_epochs: 15
+  max_num_workers: 32
+  max_performance: 1.0
+  min_performance: 0.7
+  model: densenet121
+  n_channels: 3
+  n_classes: 2
+  num_adv: 0
+  optimizer: adam
+  phase: train
+  save_folder: /scratch/users/acorso/results/
+  seed: 0
+  size:
+  - 96
+  - 96
+  test_dataset_length: 1024
+  test_ds_datasets:
+  - camelyon17-test
+  - camelyon17-id_test-corruption1_test
+  test_id_dataset: camelyon17-id_test
+  test_ood_datasets:
+  - gaussian_noise
+  - fmow-id_test
+  - rxrx1-id_test
+  - iwildcam-id_test
+  train_batch_size: 1024
+  train_dataset: camelyon17-train
+  transforms:
+  - wilds_default_normalization
+  val_batch_size: 1024
+  val_dataset_length: 1024
+  val_ds_datasets:
+  - camelyon17-val
+  - camelyon17-id_val-corruption1_val
+  val_id_dataset: camelyon17-id_val
+  val_ood_datasets:
+  - gaussian_noise
+  - fmow-id_val
+  - rxrx1-id_val
+  - iwildcam-id_val
+  w_cal: 0.2
+  w_oodd: 0.2
+  w_perf: 0.2
+  w_rob: 0.2
+  w_sec: 0.0

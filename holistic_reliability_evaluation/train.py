@@ -11,7 +11,7 @@ import wandb
 
 # Load the function to get the model type from the algorithm string
 sys.path.append(os.path.join(os.path.dirname(__file__)))
-from hre_model import get_model_class
+from hre_model import ClassificationTask
 from utils import load_config
 
 parser = argparse.ArgumentParser()
@@ -38,7 +38,6 @@ logger = WandbLogger(
 
 # print and merge the configs
 config.update(wandb.config)
-print("wandb config: ", wandb.config)
 
 # Build the trainer
 trainer = pl.Trainer(
@@ -80,7 +79,7 @@ trainer = pl.Trainer(
             filename="best_{val_ood_detection:.2f}-{epoch}-{step}",
         ),
         ModelCheckpoint(
-            monitor="hre_score",
+            monitor="val_hre_score",
             mode="max",
             filename="best_{hre_score:.2f}-{epoch}-{step}",
         ),
@@ -92,7 +91,7 @@ trainer = pl.Trainer(
 seed_everything(config["seed"], workers=True)
 
 # Build the pytorch-lightning model based on the type of training we want to do
-model = get_model_class(config["algorithm"])(config)
+model = ClassificationTask(config)
 
 # Train the model 
 trainer.fit(model)

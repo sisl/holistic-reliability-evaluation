@@ -5,16 +5,31 @@ from torch.utils.data import DataLoader
 from torchmetrics import Accuracy, CalibrationError
 import pytorch_ood as ood
 from autoattack import AutoAttack
-from torchvision.models import get_model
+import torchvision
+from torchvision.models import get_model, get_model_weights
+import torchvision.transforms as tfs
 
 import multiprocessing
 import sys, os
 sys.path.append(os.path.dirname(__file__))
 from hre_datasets import HREDatasets, load_dataset
+from utils import flatten_model, get_predefined_transforms
 
 # Set the precision to speed things up a bit
 torch.set_float32_matmul_precision("medium")
 
+def init_fine_tune(model, n_classes):
+    # Start by freezing all the layers
+    for param in model.parameters():
+        param.requires_grad = False
+        
+    # replace the classifier
+    if isinstance(model, torchvision.models.DenseNet):
+        model.classifier = nn.Linear(model.classifier.in_features, n_classes)
+        for param in model.classifier.parameters():
+            param.requires_grad = True
+    
+    
 # Options for the selection of the optimizer
 optimizer_options = {
     "adam": torch.optim.Adam,
@@ -24,56 +39,53 @@ optimizer_options = {
     "adamw": torch.optim.AdamW,
 }
 
-def get_model_class(name):
-    if name == "erm":
-        return ClassificationTask
-    else:
-        raise ValueError("Model name {} not recognized".format(name))
-
-
 class HREModel(pl.LightningModule):
     def __init__(
         self,
-        model,  # Underlying model
         config,  # Configuration file where are the model parameters are set
     ):
         super().__init__()
 
         # Save the hyperparameters
-        self.save_hyperparameters(ignore=["model"])
+        self.save_hyperparameters()
 
-        # Store model and config
-        self.model = model
+        # Store config
         self.config = config
 
         # Generate the datatsets
         data_dir = config["data_dir"]
 
-        # Load the training datasets
+        # Get information on the datasets
         self.size = tuple(config["size"])
         self.n_channels = config["n_channels"]
-        self.transforms = config["transforms"]
+        self.n_classes = config["n_classes"]
         
-        self.train_dataset = load_dataset(data_dir, config["train_dataset"], self.size, self.n_channels, self.transforms)
+        # Load the transforms
+        self.train_transforms = [get_predefined_transforms(config["train_transforms"], config)]
+        self.eval_transforms = [get_predefined_transforms(config["eval_transforms"], config)]
+        both_transforms = [tfs.Compose([*self.train_transforms, *self.eval_transforms])]
+        
+        # Load the train dataset
+        self.train_dataset = load_dataset(data_dir, config["train_dataset"], self.size, self.n_channels, both_transforms)
 
         # Build the val and test datasets
-        val = load_dataset(data_dir, config["val_id_dataset"], self.size, self.n_channels, self.transforms)
+        val = load_dataset(data_dir, config["val_id_dataset"], self.size, self.n_channels, self.eval_transforms)
         val_ds_datasets = [
-            load_dataset(data_dir, name, self.size, self.n_channels, self.transforms) for name in config["val_ds_datasets"]
+            load_dataset(data_dir, name, self.size, self.n_channels, self.eval_transforms) for name in config["val_ds_datasets"]
         ]
         val_ood_datasets = [
-            load_dataset(data_dir, name, self.size, self.n_channels, self.transforms) for name in config["val_ood_datasets"]
+            load_dataset(data_dir, name, self.size, self.n_channels, self.eval_transforms) for name in config["val_ood_datasets"]
         ]
         self.val_datasets = HREDatasets(
             val, val_ds_datasets, val_ood_datasets, length=config["val_dataset_length"]
         )
 
-        test = load_dataset(data_dir, config["test_id_dataset"], self.size, self.n_channels, self.transforms)
+        test = load_dataset(data_dir, config["test_id_dataset"], self.size, self.n_channels, self.eval_transforms)
         test_ds_datasets = [
-            load_dataset(data_dir, name, self.size, self.n_channels, self.transforms) for name in config["test_ds_datasets"]
+            load_dataset(data_dir, name, self.size, self.n_channels, self.eval_transforms) for name in config["test_ds_datasets"]
         ]
         test_ood_datasets = [
-            load_dataset(data_dir, name, self.size, self.n_channels, self.transforms) for name in config["test_ood_datasets"]
+            load_dataset(data_dir, name, self.size, self.n_channels, self.eval_transforms) for name in config["test_ood_datasets"]
         ]
         self.test_datasets = HREDatasets(
             test,
@@ -107,12 +119,10 @@ class HREModel(pl.LightningModule):
         self.lr = config["lr"]
 
     ## Pytorch Lightning functions
-    def forward(self, x):
-        return self.model(x)
-
     def configure_optimizers(self):
         # TODO: Learning rate scheduler?
-        return self.optimizer(self.parameters(), lr=self.lr)
+
+        return self.optimizer(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr)
 
     def training_step(self, batch, batch_idx):
         x, y = batch[0], batch[1]
@@ -270,14 +280,21 @@ class HREModel(pl.LightningModule):
 # Instantiate the defaults for a classification task
 class ClassificationTask(HREModel):
     def __init__(self, config, model=None, *args, **kwargs):
-        # TODO: Torchvision provides easy pre-trained weights
-
-        self.n_classes = config["n_classes"]
-        if model is None:
-            model = get_model(config["model"], num_classes=self.n_classes)
-
         # Call the HRE constuctor
-        super().__init__(model, config, *args, **kwargs)
+        super().__init__(config, *args, **kwargs)
+        
+        # Load the model, possibly with pre-trained weights
+        if model is None:
+            if "pretrained_weights" not in config or config["pretrained_weights"] == "none":
+                self.model = get_model(config["model"], num_classes=self.n_classes)
+            elif config["pretrained_weights"] == "default":
+                weights = get_model_weights(config["model"]).DEFAULT
+                self.model = get_model(config["model"], weights=weights)
+                init_fine_tune(self.model, self.n_classes)
+            else:
+                raise ValueError("Unknown pretrained weights option {}".format(config["pretrained_weights"]))
+        else:
+            self.model=model
 
         # Set the defaults for a classification task
         # By default we set the performance metric to accuracy
@@ -292,9 +309,13 @@ class ClassificationTask(HREModel):
 
         # By default use an energy based OOD detector
         self.ood_detector = ood.detector.EnergyBased(self.model)
+        
         # By default use the cross entropy loss
         self.loss_fn = nn.CrossEntropyLoss(label_smoothing=config["label_smoothing"])
 
+    def forward(self, x):
+        return self.model(x)
+    
     # By default, we use a gradient based attack
     def adversarial_performance(self, batch):
         if self.num_adv == 0:

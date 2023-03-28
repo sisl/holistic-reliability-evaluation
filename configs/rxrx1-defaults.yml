@@ -9,7 +9,8 @@ n_classes: 1139
 train_dataset: rxrx1-train
 size: [256, 256]
 n_channels: 3
-transforms: [standardize]
+train_transforms: []
+eval_transforms: [standardize]
 # These are for scaling the performance:
 min_performance: 0.
 max_performance: 1.0
@@ -26,6 +27,8 @@ train_batch_size: 32
 optimizer: adam
 model: resnet50
 label_smoothing: 0.0
+pretrained_weights: none
+train_last_k: 0
 
 # HRE setup
 val_id_dataset: rxrx1-id_val

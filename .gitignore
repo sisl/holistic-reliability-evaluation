@@ -1,8 +1,4 @@
-trained_models/
-data/
 .vscode/
-results
-outputs
 .DS_Store
 
 # Byte-compiled / optimized / DLL files

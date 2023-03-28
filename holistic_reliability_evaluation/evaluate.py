@@ -3,31 +3,42 @@ from pytorch_lightning.loggers import CSVLogger
 
 import sys, os
 sys.path.append(os.path.dirname(__file__))
-from load_wilds_models import *
 from hre_model import ClassificationTask
+from utils import *
 
 
-def evaluate(config, model=None, results_dir="eval_results"):
+def evaluate(
+    config,
+    model=None,
+    results_dir="eval_results",
+    inference_mode=False, 
+    validate=True, # Whether or not to call trainer.validate()
+    test=True, # Whether or not to call trainer.test()
+    name=None, # override config["algorithm"] for naming
+    version=None, # override config["seed"] for versioning
+    return_results=False, # Whether or not to return the dataframe containing results
+):
     hremodel = ClassificationTask(config, model)
-    
+
+    if name is None:
+        name = config["algorithm"]
+
+    if version is None:
+        version = config["seed"]
+
     trainer = pl.Trainer(
         accelerator=config["accelerator"],
         devices=config["devices"],
-        logger=CSVLogger(
-            results_dir, name=config["algorithm"], version=config["seed"]
-        ),
-        inference_mode=False,
+        logger=CSVLogger(results_dir, name=name, version=version),
+        inference_mode=inference_mode,
     )
 
-    trainer.validate(hremodel)
-    trainer.test(hremodel)
+    if validate:
+        trainer.validate(hremodel)
 
-
-def evaluate_all_seeds(algorithm, load_fn, ckpt_gen, config, Nseeds, results_dir="eval_results", args={}):
-    config["algorithm"] = algorithm
-    config["wilds_pretrained"] = True
-    for seed in range(Nseeds):
-        config["checkpoint_path"] = ckpt_gen(seed)
-        config["seed"] = seed
-        wilds_model = load_fn(config["checkpoint_path"], config["n_classes"], **args)
-        evaluate(config, wilds_model, results_dir)
+    if test:
+        trainer.test(hremodel)
+    
+    if return_results:
+        return load_results(trainer.logger.log_dir)
+    
