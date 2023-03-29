@@ -164,10 +164,10 @@ savefig("analysis/figures/metric_correlations.png")
 
 ## Plot some individual relationships of interest
 # Sanity check of val vs test performance
-p1 = plot_relationship(results["camelyon17"], "val_performance", "test_performance", p=plot(title="ID-Test vs ID-Val Performance", xlabel="ID-Val Performance", ylabel="ID-Test Performance"), show_yeqx=true, scale_yeqx=false)
-p2 = plot_relationship(results["iwildcam"], "val_performance", "test_performance", p=plot(title="ID-Test vs ID-Val Performance", xlabel="ID-Val Performance", ylabel="ID-Test Performance"), show_yeqx=true, scale_yeqx=false)
-p3 = plot_relationship(results["fmow"], "val_performance", "test_performance", p=plot(title="ID-Test vs ID-Val Performance", xlabel="ID-Val Performance", ylabel="ID-Test Performance"), show_yeqx=true, scale_yeqx=false)
-p4 = plot_relationship(results["rxrx1"], "val_performance", "test_performance", p=plot(title="ID-Test vs ID-Val Performance", xlabel="ID-Val Performance", ylabel="ID-Test Performance"), show_yeqx=true, scale_yeqx=false)
+p1 = plot_relationship(results["camelyon17"], "val_performance", "test_performance", p=plot(title="Camelyon17", xlabel="ID-Val Performance", ylabel="ID-Test Performance"), show_yeqx=true, scale_yeqx=false)
+p2 = plot_relationship(results["iwildcam"], "val_performance", "test_performance", p=plot(title="iWildCam", xlabel="ID-Val Performance", ylabel="ID-Test Performance"), show_yeqx=true, scale_yeqx=false)
+p3 = plot_relationship(results["fmow"], "val_performance", "test_performance", p=plot(title="fMoW", xlabel="ID-Val Performance", ylabel="ID-Test Performance"), show_yeqx=true, scale_yeqx=false)
+p4 = plot_relationship(results["rxrx1"], "val_performance", "test_performance", p=plot(title="RxRx1", xlabel="ID-Val Performance", ylabel="ID-Test Performance"), show_yeqx=true, scale_yeqx=false)
 plot(p1, p2, p3, p4, layout=(1, 4), size=(4*400, 400), dpi=300)
 savefig("analysis/figures/test_vs_val_accuracy.png")
 
