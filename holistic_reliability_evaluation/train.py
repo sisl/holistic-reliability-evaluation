@@ -4,7 +4,7 @@ import argparse
 
 # Load pytorch lightning stuff for the trainer setup
 import pytorch_lightning as pl
-from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.loggers import WandbLogger, CSVLogger
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning import seed_everything
 import wandb
@@ -35,6 +35,7 @@ logger = WandbLogger(
         project=config["train_dataset"],
         save_dir=savedir,
         )
+csvlogger = CSVLogger(savedir, name=config["train_dataset"], version=config["seed"])
 
 # print and merge the configs
 config.update(wandb.config)
@@ -44,7 +45,7 @@ trainer = pl.Trainer(
     max_epochs=config["max_epochs"],
     accelerator=config["accelerator"],
     devices=config["devices"],
-    logger=logger,
+    logger=[logger, csvlogger],
     enable_progress_bar=True,
     log_every_n_steps=50,
     callbacks=[

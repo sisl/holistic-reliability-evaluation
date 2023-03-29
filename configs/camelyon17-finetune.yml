@@ -7,7 +7,7 @@ save_folder: /scratch/users/acorso/results/
 data_dir: /scratch/users/acorso/data/
 n_classes: 2
 train_dataset: camelyon17-train
-size: [96, 96]
+size: [224, 224] # Required by the vision transformer
 n_channels: 3
 train_transforms: []
 eval_transforms: [pretrain_default]
@@ -21,14 +21,14 @@ accelerator: gpu
 devices: 1
 
 # Training params - (Many of these are likely going to be tuned)
-max_epochs: 15
+max_epochs: 5
 lr: 0.001
 train_batch_size: 1024
 optimizer: adamw
-model: densenet121
-label_smoothing: 0.0
-pretrained_weights: default
-train_last_k: 1
+model: VIT_L_16
+label_smoothing: 0.01
+pretrained_weights: IMAGENET1K_SWAG_LINEAR_V1
+freeze_weights: True
 
 # HRE setup
 val_id_dataset: camelyon17-id_val

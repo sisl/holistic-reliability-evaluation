@@ -3,19 +3,19 @@ include("plotting_utils.jl")
 function domain_shift_performance_relationships(dataset, datasetname)
     # Plot Domain shifted performance vs in-distribution performance 
     # p1 = plot_relationship(results[dataset], "val_performance", "$dataset-val_performance", p=plot(title="DS-Val vs ID Performance", xlabel="ID-Val Performance", ylabel="DS-Val Performance"))
-    p2 = plot_relationship(results[dataset], "val_performance", "$dataset-test_performance", p=plot(title=datasetname, xlabel="ID-Val Performance", ylabel="DS-Test Performance"))
+    p2 = plot_relationship(results[dataset], "val_performance", "$dataset-test_performance", p=plot(title=datasetname, xlabel="ID-Val Performance", ylabel="DS-Test Performance"), show_yeqx=true, scale_yeqx=false)
 
     # Plot Domain shifted performance vs other domain shifted performance
-    p3 = plot_relationship(results[dataset], "$dataset-val_performance", "$dataset-test_performance", p=plot(title="", xlabel="DS-Val Performance", ylabel="DS-Test Performance"))
+    p3 = plot_relationship(results[dataset], "$dataset-val_performance", "$dataset-test_performance", p=plot(title="", xlabel="DS-Val Performance", ylabel="DS-Test Performance"), show_yeqx=true, scale_yeqx=false)
 
     # Plot Domain shifted performance vs corruption performance
     # p4 = plot_relationship(results[dataset], "$dataset-id_val-corruption1_val_performance", "$dataset-val_performance", p=plot(title="DS-Val vs C1-Val Performance", xlabel="C1-Val Performance", ylabel="DS-Val Performance"))
-    p5 = plot_relationship(results[dataset], "$dataset-id_val-corruption1_val_performance", "$dataset-test_performance", p=plot(title="", xlabel="C1-Val Performance", ylabel="DS-Test Performance"))
+    p5 = plot_relationship(results[dataset], "$dataset-id_val-corruption1_val_performance", "$dataset-test_performance", p=plot(title="", xlabel="C1-Val Performance", ylabel="DS-Test Performance"), show_yeqx=true, scale_yeqx=false)
     # p6 = plot_relationship(results[dataset], "$dataset-id_test-corruption1_test_performance", "$dataset-val_performance", p=plot(title="DS-Val vs C1-Test Performance", xlabel="C1-Test Performance", ylabel="DS-Val Performance"))
     # p7 = plot_relationship(results[dataset], "$dataset-id_test-corruption1_test_performance", "$dataset-test_performance", p=plot(title="DS-Test vs C1-Test Performance", xlabel="C1-Test Performance", ylabel="DS-Test Performance"))
 
     # Plot the corruption performances against each other
-    p8 = plot_relationship(results[dataset], "$dataset-id_val-corruption1_val_performance", "$dataset-id_test-corruption1_test_performance", p=plot(title="", xlabel="C1-Val Performance", ylabel="C1-Test Performance"))
+    p8 = plot_relationship(results[dataset], "$dataset-id_val-corruption1_val_performance", "$dataset-id_test-corruption1_test_performance", p=plot(title="", xlabel="C1-Val Performance", ylabel="C1-Test Performance"), show_yeqx=true, scale_yeqx=false)
 
     plot( p2, p3, p5, p8, layout=(4, 1), size=(600, 400*4), left_margin=25Plots.mm)
 end
@@ -159,7 +159,7 @@ p6 = plot_metric_correlations(results["fmow"], prefix="test", title="Metric Corr
 p7 = plot_metric_correlations(results["rxrx1"], title="Metric Correlations on RxRx1 (Val)", colorbar=true)
 p8 = plot_metric_correlations(results["rxrx1"], prefix="test", title="Metric Correlations on RxRx1 (Test)", colorbar=true)
 
-plot(p1, p3, p5, p7, p2, p4, p6, p8, layout=grid(2,4, widths=(2/9,2/9,2/9,1/3)), size=(1800,800), bottommargin=10Plots.mm, dpi=300)
+plot(p1, p3, p5, p7, p2, p4, p6, p8, layout=grid(2,4, widths=(0.215,0.215,0.215,0.355)), size=(1800,800), bottommargin=10Plots.mm, dpi=300)
 savefig("analysis/figures/metric_correlations.png")
 
 ## Plot some individual relationships of interest
@@ -172,10 +172,10 @@ plot(p1, p2, p3, p4, layout=(1, 4), size=(4*400, 400), dpi=300)
 savefig("analysis/figures/test_vs_val_accuracy.png")
 
 # Performance vs ds performance
-p1 = plot_relationship(results["camelyon17"], "test_performance", "test_ds_performance", p=plot(title="Test Performance vs ID-Test Performance", xlabel="ID-Test Performance", ylabel="Test Robustness"), show_yeqx=true)
-p2 = plot_relationship(results["iwildcam"], "test_performance", "test_ds_performance", p=plot(title="Test Performance vs ID-Test Performance", xlabel="ID-Test Performance", ylabel="Test Robustness"), show_yeqx=true)
-p3 = plot_relationship(results["fmow"], "test_performance", "test_ds_performance", p=plot(title="Test Performance vs ID-Test Performance", xlabel="ID-Test Performance", ylabel="Test Robustness"), show_yeqx=true)
-p4 = plot_relationship(results["rxrx1"], "test_performance", "test_ds_performance", p=plot(title="Test Performance vs ID-Test Performance", xlabel="ID-Test Performance", ylabel="Test Robustness"), show_yeqx=true)
+p1 = plot_relationship(results["camelyon17"], "test_performance", "test_ds_performance", p=plot(title="Test Performance vs ID-Test Performance", xlabel="ID-Test Performance", ylabel="Test Robustness"), show_yeqx=true, scale_yeqx=false)
+p2 = plot_relationship(results["iwildcam"], "test_performance", "test_ds_performance", p=plot(title="Test Performance vs ID-Test Performance", xlabel="ID-Test Performance", ylabel="Test Robustness"), show_yeqx=true, scale_yeqx=false)
+p3 = plot_relationship(results["fmow"], "test_performance", "test_ds_performance", p=plot(title="Test Performance vs ID-Test Performance", xlabel="ID-Test Performance", ylabel="Test Robustness"), show_yeqx=true, scale_yeqx=false)
+p4 = plot_relationship(results["rxrx1"], "test_performance", "test_ds_performance", p=plot(title="Test Performance vs ID-Test Performance", xlabel="ID-Test Performance", ylabel="Test Robustness"), show_yeqx=true, scale_yeqx=false)
 plot(p1, p2, p3, p4, layout=(1, 4), size=(4*400, 400), dpi=300)
 savefig("analysis/figures/ds_vs_id_performance")
 
@@ -192,7 +192,7 @@ p2 = plot_relationship(results["iwildcam"], "test_performance", "test_calibratio
 p3 = plot_relationship(results["fmow"], "test_performance", "test_calibration", p=plot(title="Test Calibration vs ID-Test Performance", xlabel="ID-Test Performance", ylabel="Test Calibration"))
 p4 = plot_relationship(results["rxrx1"], "test_performance", "test_calibration", p=plot(title="Test Calibration vs ID-Test Performance", xlabel="ID-Test Performance", ylabel="Test Calibration"))
 plot(p1, p2, p3, p4, layout=(1, 4), size=(4*400, 400), dpi=300)
-savefig("calibration_vs_performance.png")
+savefig("analysis/figures/calibration_vs_performance.png")
 
 # Performance and security
 p1 = plot_relationship(results["camelyon17"], "test_performance", "test_security", p=plot(title="Test Security vs ID-Test Performance", xlabel="ID-Test Performance", ylabel="Test Security"))
@@ -208,6 +208,15 @@ p3 = plot_relationship(results["fmow"], "test_performance", "test_ood_detection"
 p4 = plot_relationship(results["rxrx1"], "test_performance", "test_ood_detection", p=plot(title="Test Fault Detection vs ID-Test Performance", xlabel="ID-Test Performance", ylabel="Test Fault Detection"))
 plot(p1, p2, p3, p4, layout=(1, 4), size=(4*450, 450), dpi=300)
 savefig("analysis/figures/fault_detection_vs_perf.png")
+
+
+# Check val and test hre performance
+p1 = plot_relationship(results["camelyon17"], "val_hre_score", "test_hre_score", p=plot(title="Test HRE  vs Val HRE", xlabel="HRE (Val)", ylabel="HRE (Test)"), show_yeqx=true, scale_yeqx=false)
+p2 = plot_relationship(results["iwildcam"], "val_hre_score", "test_hre_score", p=plot(title="Test HRE  vs Val HRE", xlabel="HRE (Val)", ylabel="HRE (Test)"), show_yeqx=true, scale_yeqx=false)
+p3 = plot_relationship(results["fmow"], "val_hre_score", "test_hre_score", p=plot(title="Test HRE  vs Val HRE", xlabel="HRE (Val)", ylabel="HRE (Test)"), show_yeqx=true, scale_yeqx=false)
+p4 = plot_relationship(results["rxrx1"], "val_hre_score", "test_hre_score", p=plot(title="Test HRE  vs Val HRE", xlabel="HRE (Val)", ylabel="HRE (Test)"), show_yeqx=true, scale_yeqx=false)
+plot(p1, p2, p3, p4, layout=(1, 4), size=(4*400, 400), dpi=300)
+savefig("analysis/figures/test_hre_vs_val_hre.png")
 
 
 ## Compare individual algorithms across metrics (one plot per dataset)
@@ -241,21 +250,56 @@ savefig("analysis/figures/fault_detection_vs_perf.png")
 # plot(p1, p2, p3, p4, p5, p6, p7, p8, layout=(4, 2), size=(600*2, 400*4))
 # savefig("analysis/figures/hre_plots.png")
 
-## Compare HRE scores for each
-p1 = scatter_scores(results["camelyon17"]; metric="test_hre_score", p=plot(ylabel="Performance (Test)", title="Cameylon17 Performance"))
-p2 = scatter_scores(results["iwildcam"]; metric="test_hre_score", p=plot(ylabel="Performance (Test)", title="iWildCam Performance"))
-p3 = scatter_scores(results["fmow"]; metric="test_hre_score", p=plot(ylabel="Performance (Test)", title="fMoW Performance"))
-p4 = scatter_scores(results["rxrx1"]; metric="test_hre_score", p=plot(ylabel="Performance (Test)", title="RxRx1 Performance"))
-plot(p1, p2, p3, p4, layout=grid(1, 4, widths=(0.28, 0.28, 0.28, 0.16)), size=(400*4, 400), bottom_margin=30Plots.mm, left_margin=10Plots.mm, dpi=300)
+function scatter_plots(metric, metric_name)
+    p1 = scatter_scores(results["camelyon17"]; metric, p=plot(ylabel=metric_name, title="Cameylon17 $metric_name"))
+    p2 = scatter_scores(results["iwildcam"]; metric, p=plot(ylabel=metric_name, title="iWildCam $metric_name"))
+    p3 = scatter_scores(results["fmow"]; metric, p=plot(ylabel=metric_name, title="fMoW $metric_name"))
+    p4 = scatter_scores(results["rxrx1"]; metric, p=plot(ylabel=metric_name, title="RxRx1 $metric_name"))
+    plot(p1, p2, p3, p4, layout=grid(1, 4, widths=(0.28, 0.28, 0.28, 0.16)), size=(400*4, 400), bottom_margin=30Plots.mm, left_margin=10Plots.mm, dpi=300)
+end
+
+scatter_plots("val_performance", "Performance (Val)")
+savefig("analysis/figures/val_performance_plots.png")
+
+scatter_plots("test_performance", "Performance (Test)")
+savefig("analysis/figures/test_performance_plots.png")
+
+scatter_plots("val_ds_performance", "DS Performance (Val)")
+savefig("analysis/figures/val_ds_performance_plots.png")
+
+scatter_plots("test_ds_performance", "DS Performance (Test)")
+savefig("analysis/figures/test_ds_performance_plots.png")
+
+scatter_plots("val_robustness", "Robustness (Val)")
+savefig("analysis/figures/val_robustness_plots.png")
+
+scatter_plots("test_robustness", "Robustness (Test)")
+savefig("analysis/figures/test_robustness_plots.png")
+
+scatter_plots("val_security", "Security (Val)")
+savefig("analysis/figures/val_security_plots.png")
+
+scatter_plots("test_security", "Security (Test)")
+savefig("analysis/figures/test_security_plots.png")
+
+scatter_plots("val_calibration", "Calibration (Val)")
+savefig("analysis/figures/val_calibration_plots.png")
+
+scatter_plots("test_calibration", "Calibration (Test)")
+savefig("analysis/figures/test_calibration_plots.png")
+
+scatter_plots("val_ood_detection", "Fault Detection (Val)")
+savefig("analysis/figures/val_fault_detection_plots.png")
+
+scatter_plots("test_ood_detection", "Fault Detection  (Test)")
+savefig("analysis/figures/test_fault_detection_plots.png")
+
+scatter_plots("val_hre_score", "HRE Score (Val)")
+savefig("analysis/figures/val_hre_score_plots.png")
+
+scatter_plots("test_hre_score", "HRE Score (Test)")
 savefig("analysis/figures/test_hre_score_plots.png")
 
-## Compare ID Accuracy scores for each
-p1 = scatter_scores(results["camelyon17"]; metric="test_performance", p=plot(ylabel="Performance (Test)", title="Cameylon17 Performance"))
-p2 = scatter_scores(results["iwildcam"]; metric="test_performance", p=plot(ylabel="Performance (Test)", title="iWildCam Performance"))
-p3 = scatter_scores(results["fmow"]; metric="test_performance", p=plot(ylabel="Performance (Test)", title="fMoW Performance"))
-p4 = scatter_scores(results["rxrx1"]; metric="test_performance", p=plot(ylabel="Performance (Test)", title="RxRx1 Performance"))
-plot(p1, p2, p3, p4, layout=grid(1, 4, widths=(0.28, 0.28, 0.28, 0.16)), size=(400*4, 400), bottom_margin=30Plots.mm, left_margin=10Plots.mm, dpi=300)
-savefig("analysis/figures/test_performance_plots.png")
 
 ## Relationship of performance and calibration metrics to different domain shifts
 # Relationship of domain shift performance to in-distribution performance for a variety of datasets

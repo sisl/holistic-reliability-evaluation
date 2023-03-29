@@ -103,16 +103,19 @@ def plasma_fractal(mapsize=256, wibbledecay=3):
 
 
 def clipped_zoom(img, zoom_factor):
-    h = img.shape[0]
+    h, w = img.shape[0], img.shape[1]
     # ceil crop height(= crop width)
     ch = int(np.ceil(h / zoom_factor))
+    cw = int(np.ceil(w / zoom_factor))
 
-    top = (h - ch) // 2
-    img = scizoom(img[top:top + ch, top:top + ch], (zoom_factor, zoom_factor, 1), order=1)
+    toph = (h - ch) // 2
+    topw = (w - cw) // 2
+    img = scizoom(img[toph:toph + ch, topw:topw + cw], (zoom_factor, zoom_factor, 1), order=1)
     # trim off any extra pixels
-    trim_top = (img.shape[0] - h) // 2
+    trim_toph = (img.shape[0] - h) // 2
+    trim_topw = (img.shape[1] - w) // 2
 
-    return img[trim_top:trim_top + h, trim_top:trim_top + h]
+    return img[trim_toph:trim_toph + h, trim_topw:trim_topw + w]
 
 
 # /////////////// End Distortion Helpers ///////////////
@@ -122,6 +125,9 @@ def clipped_zoom(img, zoom_factor):
 
 def to_image(x):
     return PILImage.fromarray(np.uint8(np.clip(x, 0, 1)*255))
+
+def to_image_from_0_255(x):
+    return PILImage.fromarray(np.uint8(np.clip(x, 0, 255)))
 
 def gaussian_noise(x, severity=1):
     c = [.08, .12, 0.18, 0.26, 0.38][severity - 1]
@@ -200,13 +206,13 @@ def motion_blur(x, severity=1):
 
     x.motion_blur(radius=c[0], sigma=c[1], angle=np.random.uniform(-45, 45))
 
-    x = cv2.imdecode(np.fromstring(x.make_blob(), np.uint8),
+    x = cv2.imdecode(np.frombuffer(x.make_blob(), np.uint8),
                      cv2.IMREAD_UNCHANGED)
     
     if x.shape != sz:
-        return to_image(x[..., [2, 1, 0]])
+        return to_image_from_0_255(x[..., [2, 1, 0]])
     else:  # greyscale to RGB
-        return to_image(np.array([x, x, x]).transpose((1, 2, 0)))
+        return to_image_from_0_255(np.array([x, x, x]).transpose((1, 2, 0)))
 
 
 def zoom_blur(x, severity=1):
@@ -245,14 +251,14 @@ def frost(x, severity=1):
     frost = cv2.imread(os.path.join(os.path.dirname(__file__), "frosts", filename))
     
     # In case we are dealing with images that are larger than the frost image, resize
-    new_size = (max(frost.shape[0], x.size[0]+1), max(frost.shape[1], x.size[1]+1))
-    frost = cv2.resize(frost, (new_size[1], new_size[0]))
-    
-    # randomly crop and convert to rgb
-    x_start, y_start = np.random.randint(0, frost.shape[0] - x.size[0]), np.random.randint(0, frost.shape[1] - x.size[1])
-    frost = frost[x_start:x_start + x.size[0], y_start:y_start + x.size[1]][..., [2, 1, 0]]
+    new_size_wh = (max(frost.shape[1], x.size[0]+1), max(frost.shape[0], x.size[1]+1))
+    frost = cv2.resize(frost, new_size_wh)
 
-    return to_image(c[0] * np.array(x) + c[1] * frost)
+    # randomly crop and convert to rgb
+    h_start, w_start = np.random.randint(0, frost.shape[0] - x.size[1]), np.random.randint(0, frost.shape[1] - x.size[0])
+    frost = frost[h_start:h_start + x.size[1], w_start:w_start + x.size[0]][..., [2, 1, 0]]
+
+    return to_image_from_0_255(c[0] * np.array(x) + c[1] * frost)
 
 
 def snow(x, severity=1):
@@ -455,6 +461,65 @@ def test_corruptions(severity=1):
     np.random.shuffle(corruptions)
     half = len(corruptions) // 2
     return corruptions[half:]
+
+def plot_corrupted_image(x, severity=1):
+    import matplotlib.pyplot as plt
+    plt.imshow(gaussian_noise(x, severity))
+    plt.savefig("gaussian_noise.png")
+
+    plt.imshow(shot_noise(x, severity))
+    plt.savefig("shot_noise.png")
+
+    plt.imshow(impulse_noise(x, severity))
+    plt.savefig("impulse_noise.png")
+
+    plt.imshow(defocus_blur(x, severity))
+    plt.savefig("defocus_blur.png")
+
+    plt.imshow(glass_blur(x, severity))
+    plt.savefig("glass_blur.png")
+
+    plt.imshow(motion_blur(x, severity))
+    plt.savefig("motion_blur.png")
+
+    plt.imshow(zoom_blur(x, severity))
+    plt.savefig("zoom_blur.png")
+
+    plt.imshow(snow(x, severity))
+    plt.savefig("snow.png")
+
+    plt.imshow(frost(x, severity))
+    plt.savefig("frost.png")
+
+    plt.imshow(fog(x, severity))
+    plt.savefig("fog.png")
+
+    plt.imshow(brightness(x, severity))
+    plt.savefig("brightness.png")
+
+    plt.imshow(contrast(x, severity))
+    plt.savefig("contrast.png")
+
+    plt.imshow(elastic_transform(x, severity))
+    plt.savefig("elastic_transform.png")
+
+    plt.imshow(pixelate(x, severity))
+    plt.savefig("pixelate.png")
+
+    plt.imshow(jpeg_compression(x, severity))
+    plt.savefig("jpeg_compression.png")
+
+    plt.imshow(speckle_noise(x, severity))
+    plt.savefig("speckle_noise.png")
+
+    plt.imshow(gaussian_blur(x, severity))
+    plt.savefig("gaussian_blur.png")
+
+    plt.imshow(spatter(x, severity))
+    plt.savefig("spatter.png")
+
+    plt.imshow(saturate(x, severity))
+    plt.savefig("saturate.png")
 
     
     

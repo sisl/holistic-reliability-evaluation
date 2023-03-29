@@ -68,10 +68,11 @@ def get_predefined_transforms(transform_strings, config):
         elif transform_name == "random_rotation":
             transforms.append(random_rotation_transform())
         elif transform_name == "pretrain_default":
-            assert config["pretrained_weights"] == "default"
-            transforms.append(get_model_weights(config["model"]).DEFAULT.transforms())
+            # Using pre-trained transforms
+            transforms.append(getattr(get_model_weights(config["model"]), config["pretrained_weights"]).transforms())
         else:
             raise ValueError(f"Unknown transform {transform_name}")
-        
+    
+    print("Transforms: ", transforms)
     return tfs.Compose(transforms)
         

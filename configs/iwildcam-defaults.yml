@@ -27,8 +27,8 @@ train_batch_size: 32
 optimizer: adam
 model: resnet50
 label_smoothing: 0.0
-pretrained_weights: none
-train_last_k: 0
+pretrained_weights: DEFAULT
+freeze_weights: False
 
 # HRE setup
 val_id_dataset: iwildcam-id_val

@@ -63,8 +63,8 @@ function compare_metrics(sm, greedy, random, dataset, dataset_name)
     rens_hres = mean([rens_perfs, rens_robs, rens_calibs, rens_oods])
 
     scatter(perfs, hres, title = dataset_name, label="Single models", xlabel="ID Performance", ylabel="HRE", markerstrokecolor=:auto, alpha=0.7)
-    scatter!(ens_perfs, ens_hres, label="Greedy Ensemble", markerstrokecolor=:auto, alpha=0.7)
-    scatter!(rens_perfs, rens_hres, label="Random Ensemble", markerstrokecolor=:auto, alpha=0.7)
+    scatter!(ens_perfs, ens_hres, label="Greedy Ensemble", color=3, markerstrokecolor=:auto, alpha=0.7)
+    scatter!(rens_perfs, rens_hres, label="Random Ensemble", color=4, markerstrokecolor=:auto, alpha=0.7)
 end
 
 cumulative_ensemble = load_results("results/ensemble_results/cumulative")
@@ -104,4 +104,33 @@ p1 = compare_metrics(single_model_results, greedy_ensemble, random_ensemble, "ca
 p2 = compare_metrics(single_model_results, greedy_ensemble, random_ensemble, "iwildcam", "iWildCam")
 p3 = compare_metrics(single_model_results, greedy_ensemble, random_ensemble, "fmow", "fMoW")
 p4 = compare_metrics(single_model_results, greedy_ensemble, random_ensemble, "rxrx1", "RxRx1")
-plot(p1, p2, p3, p4, layout=(1,4), size=(400*4, 400), left_margin=10Plots.mm, bottom_margin=10Plots.mm)
+plot(p1, p2, p3, p4, layout=(1,4), size=(400*4, 400), left_margin=10Plots.mm, bottom_margin=10Plots.mm, dpi=300)
+
+savefig("analysis/figures/ensemble_comparison.png")
+
+
+# Compare performance vs model size:
+
+
+
+function plot_metric_by_num_model(dataset, dataset_name, metric, metric_name)
+    index = 1
+    if occursin("test",  metric)
+        index = 2
+    end
+    num_models = [sum(isdigit(c) for c in replace(k, "v2"=>"")) for (k,v) in random_ensemble[dataset]]
+    hres = [v["version_0"][1][index, metric] for (k,v) in random_ensemble[dataset]]
+
+    num_models_greedy = [sum(isdigit(c) for c in replace(k, "v2"=>"")) for (k,v) in greedy_ensemble[dataset]]
+    hres_greedy = [v["version_0"][1][index, metric] for (k,v) in greedy_ensemble[dataset]]
+
+    scatter(num_models, hres, label="Random Ensemble", color=4, alpha=0.7, title=dataset_name, xlabel="Number of Models", ylabel=metric_name, markerstrokecolor=:auto)
+    scatter!(num_models_greedy, hres_greedy, label="Greedy Ensemble", color=3, alpha=0.7, markerstrokecolor=:auto)
+end
+
+p1 = plot_metric_by_num_model("camelyon17", "Camelyon17", "test_hre_score", "HRE (Test)")
+p2 = plot_metric_by_num_model("iwildcam", "iWildCam", "test_hre_score", "HRE (Test)")
+p3 = plot_metric_by_num_model("fmow", "fMoW", "test_hre_score", "HRE (Test)")
+p4 = plot_metric_by_num_model("rxrx1", "RxRx1", "test_hre_score", "HRE (Test)")
+plot(p1, p2, p3, p4, layout=(1,4), size=(400*4, 400), left_margin=10Plots.mm, bottom_margin=10Plots.mm, dpi=300)
+savefig("analysis/figures/ensemble_size.png")

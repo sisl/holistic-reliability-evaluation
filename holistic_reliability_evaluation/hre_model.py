@@ -18,15 +18,29 @@ from utils import flatten_model, get_predefined_transforms
 # Set the precision to speed things up a bit
 torch.set_float32_matmul_precision("medium")
 
-def init_fine_tune(model, n_classes):
+def swap_classifier(model, n_classes):
+    if isinstance(model, torchvision.models.DenseNet):
+        model.classifier = nn.Linear(model.classifier.in_features, n_classes)
+    if isinstance(model, torchvision.models.VisionTransformer):
+        model.heads[-1] = nn.Linear(model.heads[-1].in_features, n_classes)
+    if isinstance(model, torchvision.models.ResNet):
+        model.fc = nn.Linear(model.fc.in_features, n_classes)
+    
+
+def freeze_weights(model):
     # Start by freezing all the layers
     for param in model.parameters():
         param.requires_grad = False
         
-    # replace the classifier
+    # Unfreeze the classifier layer
     if isinstance(model, torchvision.models.DenseNet):
-        model.classifier = nn.Linear(model.classifier.in_features, n_classes)
         for param in model.classifier.parameters():
+            param.requires_grad = True
+    if isinstance(model, torchvision.models.VisionTransformer):
+        for param in model.heads[-1].parameters():
+            param.requires_grad = True
+    if isinstance(model, torchvision.models.ResNet):
+        for param in model.fc.parameters():
             param.requires_grad = True
     
     
@@ -287,12 +301,12 @@ class ClassificationTask(HREModel):
         if model is None:
             if "pretrained_weights" not in config or config["pretrained_weights"] == "none":
                 self.model = get_model(config["model"], num_classes=self.n_classes)
-            elif config["pretrained_weights"] == "default":
-                weights = get_model_weights(config["model"]).DEFAULT
-                self.model = get_model(config["model"], weights=weights)
-                init_fine_tune(self.model, self.n_classes)
             else:
-                raise ValueError("Unknown pretrained weights option {}".format(config["pretrained_weights"]))
+                weights = getattr(get_model_weights(config["model"]), config["pretrained_weights"])
+                self.model = get_model(config["model"], weights=weights)
+                swap_classifier(self.model, self.n_classes)
+                if config["freeze_weights"]:
+                    freeze_weights(self.model)
         else:
             self.model=model
 
