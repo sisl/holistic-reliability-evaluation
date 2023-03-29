@@ -179,6 +179,14 @@ p4 = plot_relationship(results["rxrx1"], "test_performance", "test_ds_performanc
 plot(p1, p2, p3, p4, layout=(1, 4), size=(4*400, 400), dpi=300, left_margin=10Plots.mm, bottom_margin=10Plots.mm)
 savefig("analysis/figures/ds_vs_id_performance")
 
+# DS calibration vs ID calibration
+p1 = plot_relationship(results["camelyon17"], "val_calibration", "camelyon17-val_calibration", p=plot(title="Camelyon17", xlabel="ID Test Calibration", ylabel="DS Test Calibration"), show_yeqx=true, scale_yeqx=false)
+p2 = plot_relationship(results["iwildcam"], "val_calibration", "iwildcam-val_calibration", p=plot(title="iWildCam", xlabel="ID Test Calibration", ylabel="DS Test Calibration"), show_yeqx=true, scale_yeqx=false)
+p3 = plot_relationship(results["fmow"], "val_calibration", "fmow-val_calibration", p=plot(title="fMoW", xlabel="ID Test Calibration", ylabel="DS Test Calibration"), show_yeqx=true, scale_yeqx=false)
+p4 = plot_relationship(results["rxrx1"], "val_calibration", "rxrx1-val_calibration", p=plot(title="RxRx1", xlabel="ID Test Calibration", ylabel="DS Test Calibration"), show_yeqx=true, scale_yeqx=false)
+plot(p1, p2, p3, p4, layout=(1, 4), size=(4*400, 400), dpi=300, left_margin=10Plots.mm, bottom_margin=10Plots.mm)
+savefig("analysis/figures/ds_vs_id_calibration")
+
 # Performance and robustness
 p1 = plot_relationship(results["camelyon17"], "test_performance", "test_robustness", p=plot(title="Camelyon17", xlabel="ID Test Performance", ylabel="Test Robustness"))
 p2 = plot_relationship(results["iwildcam"], "test_performance", "test_robustness", p=plot(title="iWildCam", xlabel="ID Test Performance", ylabel="Test Robustness"))
