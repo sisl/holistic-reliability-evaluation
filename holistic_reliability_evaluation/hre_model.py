@@ -25,25 +25,31 @@ def swap_classifier(model, n_classes):
         model.heads[-1] = nn.Linear(model.heads[-1].in_features, n_classes)
     if isinstance(model, torchvision.models.ResNet):
         model.fc = nn.Linear(model.fc.in_features, n_classes)
-    
 
-def freeze_weights(model):
+
+def freeze_weights(model, nlayers):
     # Start by freezing all the layers
     for param in model.parameters():
         param.requires_grad = False
-        
+
     # Unfreeze the classifier layer
     if isinstance(model, torchvision.models.DenseNet):
         for param in model.classifier.parameters():
             param.requires_grad = True
     if isinstance(model, torchvision.models.VisionTransformer):
+        assert nlayers >= 1
+        # unfreeze the first layer
         for param in model.heads[-1].parameters():
             param.requires_grad = True
+        # unfreeze the remaining k layers
+        for i in range(nlayers - 1):
+            for param in model.encoder.layers[-(i - 1)].parameters():
+                param.requires_grad = True
     if isinstance(model, torchvision.models.ResNet):
         for param in model.fc.parameters():
             param.requires_grad = True
-    
-    
+
+
 # Options for the selection of the optimizer
 optimizer_options = {
     "adam": torch.optim.Adam,
@@ -52,6 +58,7 @@ optimizer_options = {
     "adagrad": torch.optim.Adagrad,
     "adamw": torch.optim.AdamW,
 }
+
 
 class HREModel(pl.LightningModule):
     def __init__(
@@ -73,33 +80,67 @@ class HREModel(pl.LightningModule):
         self.size = tuple(config["size"])
         self.n_channels = config["n_channels"]
         self.n_classes = config["n_classes"]
-        
+
         # Load the transforms
-        self.train_transforms = [get_predefined_transforms(config["train_transforms"], config)]
-        self.eval_transforms = [get_predefined_transforms(config["eval_transforms"], config)]
+        self.train_transforms = [
+            get_predefined_transforms(config["train_transforms"], config)
+        ]
+        self.eval_transforms = [
+            get_predefined_transforms(config["eval_transforms"], config)
+        ]
         both_transforms = [tfs.Compose([*self.train_transforms, *self.eval_transforms])]
-        
+
         # Load the train dataset
-        self.train_dataset = load_dataset(data_dir, config["train_dataset"], self.size, self.n_channels, both_transforms)
+        self.train_dataset = load_dataset(
+            data_dir,
+            config["train_dataset"],
+            self.size,
+            self.n_channels,
+            both_transforms,
+        )
 
         # Build the val and test datasets
-        val = load_dataset(data_dir, config["val_id_dataset"], self.size, self.n_channels, self.eval_transforms)
+        val = load_dataset(
+            data_dir,
+            config["val_id_dataset"],
+            self.size,
+            self.n_channels,
+            self.eval_transforms,
+        )
         val_ds_datasets = [
-            load_dataset(data_dir, name, self.size, self.n_channels, self.eval_transforms) for name in config["val_ds_datasets"]
+            load_dataset(
+                data_dir, name, self.size, self.n_channels, self.eval_transforms
+            )
+            for name in config["val_ds_datasets"]
         ]
         val_ood_datasets = [
-            load_dataset(data_dir, name, self.size, self.n_channels, self.eval_transforms) for name in config["val_ood_datasets"]
+            load_dataset(
+                data_dir, name, self.size, self.n_channels, self.eval_transforms
+            )
+            for name in config["val_ood_datasets"]
         ]
         self.val_datasets = HREDatasets(
             val, val_ds_datasets, val_ood_datasets, length=config["val_dataset_length"]
         )
 
-        test = load_dataset(data_dir, config["test_id_dataset"], self.size, self.n_channels, self.eval_transforms)
+        test = load_dataset(
+            data_dir,
+            config["test_id_dataset"],
+            self.size,
+            self.n_channels,
+            self.eval_transforms,
+        )
         test_ds_datasets = [
-            load_dataset(data_dir, name, self.size, self.n_channels, self.eval_transforms) for name in config["test_ds_datasets"]
+            load_dataset(
+                data_dir, name, self.size, self.n_channels, self.eval_transforms
+            )
+            for name in config["test_ds_datasets"]
         ]
         test_ood_datasets = [
-            load_dataset(data_dir, name, self.size, self.n_channels, self.eval_transforms) for name in config["test_ood_datasets"]
+            load_dataset(
+                data_dir, name, self.size, self.n_channels, self.eval_transforms
+            )
+            for name in config["test_ood_datasets"]
         ]
         self.test_datasets = HREDatasets(
             test,
@@ -136,7 +177,9 @@ class HREModel(pl.LightningModule):
     def configure_optimizers(self):
         # TODO: Learning rate scheduler?
 
-        return self.optimizer(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr)
+        return self.optimizer(
+            filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr
+        )
 
     def training_step(self, batch, batch_idx):
         x, y = batch[0], batch[1]
@@ -151,9 +194,9 @@ class HREModel(pl.LightningModule):
             self.hre_info(
                 val_batch,
                 "val",
-                self.config["val_id_dataset"],
-                self.config["val_ds_datasets"],
-                self.config["val_ood_datasets"],
+                self.config[f"val_id_dataset"],
+                self.config[f"val_ds_datasets"],
+                self.config[f"val_ood_datasets"],
             )
         )
 
@@ -209,12 +252,16 @@ class HREModel(pl.LightningModule):
             metrics.update(self.ood_detector(ood_batch[0]), -1 * target)
         ood_metrics = metrics.compute()
         auroc = ood_metrics["AUROC"]
-        return max(auroc, 1-auroc) # We could threshold in either direction, so we take the best outcome
+        return max(
+            auroc, 1 - auroc
+        )  # We could threshold in either direction, so we take the best outcome
 
     ## Thesese functions use the above functions to compute the HRE score
     def performance_info(self, id_batch, prefix):
         perf = self.performance(id_batch)
-        perf_norm = (perf - self.min_performance) / (self.max_performance - self.min_performance)
+        perf_norm = (perf - self.min_performance) / (
+            self.max_performance - self.min_performance
+        )
         return {prefix + "_performance": perf, prefix + "_performance_norm": perf_norm}
 
     def robustness_info(self, ds_batches, id_performance, prefix, ds_names):
@@ -234,11 +281,13 @@ class HREModel(pl.LightningModule):
     def security_info(self, id_batch, id_performance, prefix, id_name):
         if id_performance == 0:
             id_performance = 1e-6
-            
+
         adv_performance = self.adversarial_performance(id_batch)
         security = min(1.0, adv_performance / id_performance)
-        return {id_name + "_adv_performance": adv_performance,
-                prefix + "_security": security}
+        return {
+            id_name + "_adv_performance": adv_performance,
+            prefix + "_security": security,
+        }
 
     def calibration_info(self, id_batch, ds_batches, prefix, id_name, ds_names):
         results = {prefix + "_calibration": 0.0}
@@ -264,9 +313,7 @@ class HREModel(pl.LightningModule):
         robustness_results = self.robustness_info(
             hrebatch["ds"], id_perf, prefix, ds_names
         )
-        security_results = self.security_info(
-            hrebatch["id"], id_perf, prefix, id_name
-        )
+        security_results = self.security_info(hrebatch["id"], id_perf, prefix, id_name)
         calibration_results = self.calibration_info(
             hrebatch["id"], hrebatch["ds"], prefix, id_name, ds_names
         )
@@ -296,19 +343,24 @@ class ClassificationTask(HREModel):
     def __init__(self, config, model=None, *args, **kwargs):
         # Call the HRE constuctor
         super().__init__(config, *args, **kwargs)
-        
+
         # Load the model, possibly with pre-trained weights
         if model is None:
-            if "pretrained_weights" not in config or config["pretrained_weights"] == "none":
+            if (
+                "pretrained_weights" not in config
+                or config["pretrained_weights"] == "none"
+            ):
                 self.model = get_model(config["model"], num_classes=self.n_classes)
             else:
-                weights = getattr(get_model_weights(config["model"]), config["pretrained_weights"])
+                weights = getattr(
+                    get_model_weights(config["model"]), config["pretrained_weights"]
+                )
                 self.model = get_model(config["model"], weights=weights)
                 swap_classifier(self.model, self.n_classes)
                 if config["freeze_weights"]:
-                    freeze_weights(self.model)
+                    freeze_weights(self.model, config["unfreeze_k_layers"])
         else:
-            self.model=model
+            self.model = model
 
         # Set the defaults for a classification task
         # By default we set the performance metric to accuracy
@@ -323,37 +375,36 @@ class ClassificationTask(HREModel):
 
         # By default use an energy based OOD detector
         self.ood_detector = ood.detector.EnergyBased(self.model)
-        
+
         # By default use the cross entropy loss
         self.loss_fn = nn.CrossEntropyLoss(label_smoothing=config["label_smoothing"])
 
     def forward(self, x):
         return self.model(x)
-    
+
     # By default, we use a gradient based attack
     def adversarial_performance(self, batch):
         if self.num_adv == 0:
             return -1.0
-        
+
         adversary = AutoAttack(self.model, device=self.device)
-        
+
         # Set the target classes to not exceed the number of remaining classes
-        adversary.fab.n_target_classes = min(9, self.n_classes-1)
-        adversary.apgd_targeted.n_target_classes = min(9, self.n_classes-1)
-        
+        adversary.fab.n_target_classes = min(9, self.n_classes - 1)
+        adversary.apgd_targeted.n_target_classes = min(9, self.n_classes - 1)
+
         # The targets pgd attack uses a loss that is not compatible with less than 4 classes
         if self.n_classes < 4:
-            adversary.attacks_to_run = ['apgd-ce', 'fab-t', 'square']
-        
+            adversary.attacks_to_run = ["apgd-ce", "fab-t", "square"]
+
         # Only use self.num_adv samples
-        x = batch[0][:self.num_adv, ...]
-        y = batch[1][:self.num_adv]
-        
+        x = batch[0][: self.num_adv, ...]
+        y = batch[1][: self.num_adv]
+
         # Run the attack and comput adversarial accuracy
         _, yadv = adversary.run_standard_evaluation(x, y, return_labels=True)
         adv_acc = sum(y == yadv).cpu().item() / y.size(0)
         return adv_acc
-
 
     # For classification we use ECE as the default calibration metric (and need to softmax it)
     def calibration(self, batch):

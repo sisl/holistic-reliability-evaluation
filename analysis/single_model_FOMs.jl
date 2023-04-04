@@ -180,10 +180,10 @@ plot(p1, p2, p3, p4, layout=(1, 4), size=(4*400, 400), dpi=300, left_margin=10Pl
 savefig("analysis/figures/ds_vs_id_performance")
 
 # DS calibration vs ID calibration
-p1 = plot_relationship(results["camelyon17"], "val_calibration", "camelyon17-val_calibration", p=plot(title="Camelyon17", xlabel="ID Test Calibration", ylabel="DS Test Calibration"), show_yeqx=true, scale_yeqx=false)
-p2 = plot_relationship(results["iwildcam"], "val_calibration", "iwildcam-val_calibration", p=plot(title="iWildCam", xlabel="ID Test Calibration", ylabel="DS Test Calibration"), show_yeqx=true, scale_yeqx=false)
-p3 = plot_relationship(results["fmow"], "val_calibration", "fmow-val_calibration", p=plot(title="fMoW", xlabel="ID Test Calibration", ylabel="DS Test Calibration"), show_yeqx=true, scale_yeqx=false)
-p4 = plot_relationship(results["rxrx1"], "val_calibration", "rxrx1-val_calibration", p=plot(title="RxRx1", xlabel="ID Test Calibration", ylabel="DS Test Calibration"), show_yeqx=true, scale_yeqx=false)
+p1 = plot_relationship(results["camelyon17"], "camelyon17-id_val_calibration", "camelyon17-test_calibration", p=plot(title="Camelyon17", xlabel="ID Test Calibration", ylabel="DS Test Calibration"), show_yeqx=true, scale_yeqx=false)
+p2 = plot_relationship(results["iwildcam"], "iwildcam-id_val_calibration", "iwildcam-test_calibration", p=plot(title="iWildCam", xlabel="ID Test Calibration", ylabel="DS Test Calibration"), show_yeqx=true, scale_yeqx=false)
+p3 = plot_relationship(results["fmow"], "fmow-id_val_calibration", "fmow-test_calibration", p=plot(title="fMoW", xlabel="ID Test Calibration", ylabel="DS Test Calibration"), show_yeqx=true, scale_yeqx=false)
+p4 = plot_relationship(results["rxrx1"], "rxrx1-id_val_calibration", "rxrx1-test_calibration", p=plot(title="RxRx1", xlabel="ID Test Calibration", ylabel="DS Test Calibration"), show_yeqx=true, scale_yeqx=false)
 plot(p1, p2, p3, p4, layout=(1, 4), size=(4*400, 400), dpi=300, left_margin=10Plots.mm, bottom_margin=10Plots.mm)
 savefig("analysis/figures/ds_vs_id_calibration")
 
@@ -309,6 +309,29 @@ savefig("analysis/figures/val_hre_score_plots.png")
 scatter_plots("test_hre_score", "HRE Score (Test)")
 savefig("analysis/figures/test_hre_score_plots.png")
 
+## Val HRE with finetuning
+p1 = scatter_scores(results["camelyon17"]; metric="val_hre_score", p=plot(ylabel="HRE Score (Val)", title="Cameylon17 HRE Score (Val)"))
+scatter!([16,16], [0.6704, 0.6402], color=string_to_color("finetune"), label="", markerstrokecolor=:auto)
+hres, algs = get_all_by_alg(results["camelyon17"], "val_hre_score")
+xticks!(1:length(algs)+1, [String.(algs)..., "ViT Finetune"], xrotation = 90)
+
+p2 = scatter_scores(results["iwildcam"]; metric="val_hre_score", p=plot(ylabel="HRE Score (Val)", title="iWildCam HRE Score (Val)"))
+scatter!([14,14,14], [0.701, 0.703, 0.698], color=string_to_color("finetune"), label="", markerstrokecolor=:auto)
+hres, algs = get_all_by_alg(results["iwildcam"], "val_hre_score")
+xticks!(1:length(algs)+1, [String.(algs)..., "ViT Finetune"], xrotation = 90)
+
+p3 = scatter_scores(results["fmow"]; metric="val_hre_score", p=plot(ylabel="HRE Score (Val)", title="fMoW HRE Score (Val)"))
+scatter!([16,16,16], [0.6223, 0.6176, 0.6133], color=string_to_color("finetune"), label="", markerstrokecolor=:auto)
+hres, algs = get_all_by_alg(results["fmow"], "val_hre_score")
+xticks!(1:length(algs)+1, [String.(algs)..., "ViT Finetune"], xrotation = 90)
+
+p4 = scatter_scores(results["rxrx1"]; metric="val_hre_score", p=plot(ylabel="HRE Score (Val)", title="RxRx1 HRE Score (Val)"))
+scatter!([5,5], [0.5156, 0.5081], color=string_to_color("finetune"), label="", markerstrokecolor=:auto, dpi=300)
+hres, algs = get_all_by_alg(results["rxrx1"], "val_hre_score")
+xticks!(1:length(algs)+1, [String.(algs)..., "ViT Finetune"], xrotation = 90)
+
+plot(p1, p2, p3, p4, layout=grid(1, 4, widths=(0.28, 0.28, 0.28, 0.16)), size=(400*4, 400), bottom_margin=30Plots.mm, left_margin=10Plots.mm, dpi=300)
+savefig("analysis/figures/val_hre_with_finetune.png")
 
 ## Relationship of performance and calibration metrics to different domain shifts
 # Relationship of domain shift performance to in-distribution performance for a variety of datasets

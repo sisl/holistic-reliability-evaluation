@@ -54,13 +54,32 @@ python ensembles.py --dataset=rxrx1 --ensemble_builder=random --n_samples=50 --m
 ```
 
 ## Running Training
+Ensure you have the wilds datasets downloaded (use `download_wilds_data.py` to do so)
+
 Run the training code by calling
 ```
 python holistic_reliability_evaluation/train.py --config configs/camelyon-defaults.yml --seed 1234
 ```
 
-Where the configuration file describes the correct parameters.
+Where the configuration file describes the correct parameters. Other examples include
+```
+python holistic_reliability_evaluation/train.py --config configs/iwildcam-defaults.yml --seed 0
+python holistic_reliability_evaluation/train.py --config configs/iwildcam-finetune.yml --seed 0
+
+python holistic_reliability_evaluation/train.py --config configs/fmow-defaults.yml --seed 0
+python holistic_reliability_evaluation/train.py --config configs/fmow-finetune.yml --seed 0
+
+python holistic_reliability_evaluation/train.py --config configs/camelyon17-defaults.yml --seed 0
+python holistic_reliability_evaluation/train.py --config configs/camelyon17-finetune.yml --seed 0
+
+python holistic_reliability_evaluation/train.py --config configs/rxrx1-defaults.yml --seed 0
+python holistic_reliability_evaluation/train.py --config configs/rxrx1-finetune.yml --seed 0
+```
 
 ### Running Tunning sweeps
 To run tuning sweeps take the following steps:
-*
+* Navigate to the appropriate results folder for the tuning results to be stored in e.g. `/scratch/users/acorso/results/iwildcam-train/finetune/tune`
+* Intialize the sweep with `wandb sweep --project iwildcam-train ~/Workspace/holistic-reliability-evaluation/configs/iwildcam-finetune-sweep.yml`
+* Make note of the sweep id (e.g. `cquza740`)
+* Run sweep agent with e.g. `wandb agent corso-stanford/iwildcam-train/cquza740`
+

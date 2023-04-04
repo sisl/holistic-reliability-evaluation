@@ -29,6 +29,7 @@ model: densenet121
 label_smoothing: 0.01
 pretrained_weights: DEFAULT
 freeze_weights: False
+unfreeze_k_layers: 0
 
 # HRE setup
 val_id_dataset: camelyon17-id_val

@@ -35,7 +35,8 @@ logger = WandbLogger(
         project=config["train_dataset"],
         save_dir=savedir,
         )
-csvlogger = CSVLogger(savedir, name=config["train_dataset"], version=config["seed"])
+
+csvlogger = CSVLogger(savedir, name=config["train_dataset"], version=logger.version)
 
 # print and merge the configs
 config.update(wandb.config)
@@ -54,37 +55,37 @@ trainer = pl.Trainer(
             mode="max",
             filename="best_{val_performance:.2f}-{epoch}-{step}",
         ),
-        ModelCheckpoint(
-            monitor="val_ds_performance",
-            mode="max",
-            filename="best_{val_ds_performance:.2f}-{epoch}-{step}",
-        ),
-        ModelCheckpoint(
-            monitor="val_robustness",
-            mode="max",
-            filename="best_{val_robustness:.2f}-{epoch}-{step}",
-        ),
-        ModelCheckpoint(
-            monitor="val_security",
-            mode="max",
-            filename="best_{val_security:.2f}-{epoch}-{step}",
-        ),
-        ModelCheckpoint(
-            monitor="val_calibration",
-            mode="max",
-            filename="best_{val_calibration:.2f}-{epoch}-{step}",
-        ),
-        ModelCheckpoint(
-            monitor="val_ood_detection",
-            mode="max",
-            filename="best_{val_ood_detection:.2f}-{epoch}-{step}",
-        ),
-        ModelCheckpoint(
-            monitor="val_hre_score",
-            mode="max",
-            filename="best_{hre_score:.2f}-{epoch}-{step}",
-        ),
-        ModelCheckpoint(save_top_k=-1),  # This saves a model after each epoch
+        # ModelCheckpoint(
+        #     monitor="val_ds_performance",
+        #     mode="max",
+        #     filename="best_{val_ds_performance:.2f}-{epoch}-{step}",
+        # ),
+        # ModelCheckpoint(
+        #     monitor="val_robustness",
+        #     mode="max",
+        #     filename="best_{val_robustness:.2f}-{epoch}-{step}",
+        # ),
+        # ModelCheckpoint(
+        #     monitor="val_security",
+        #     mode="max",
+        #     filename="best_{val_security:.2f}-{epoch}-{step}",
+        # ),
+        # ModelCheckpoint(
+        #     monitor="val_calibration",
+        #     mode="max",
+        #     filename="best_{val_calibration:.2f}-{epoch}-{step}",
+        # ),
+        # ModelCheckpoint(
+        #     monitor="val_ood_detection",
+        #     mode="max",
+        #     filename="best_{val_ood_detection:.2f}-{epoch}-{step}",
+        # ),
+        # ModelCheckpoint(
+        #     monitor="val_hre_score",
+        #     mode="max",
+        #     filename="best_{hre_score:.2f}-{epoch}-{step}",
+        # ),
+        ModelCheckpoint(),  # This saves a model after each epoch
     ],
 )
 

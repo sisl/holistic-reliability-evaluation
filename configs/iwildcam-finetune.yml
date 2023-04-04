@@ -21,7 +21,7 @@ accelerator: gpu
 devices: 1
 
 # Training params - (Many of these are likely going to be tuned)
-max_epochs: 5
+max_epochs: 15
 lr: 0.001
 train_batch_size: 1024
 optimizer: adamw
@@ -29,6 +29,7 @@ model: VIT_L_16
 label_smoothing: 0.0
 pretrained_weights: IMAGENET1K_SWAG_LINEAR_V1
 freeze_weights: True
+unfreeze_k_layers: 1
 
 # HRE setup
 val_id_dataset: iwildcam-id_val
