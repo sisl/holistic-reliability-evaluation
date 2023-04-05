@@ -8,11 +8,13 @@ sys.path.append(os.path.dirname(__file__))
 from utils import load_config
 
 
-def load_resnet50(path, out_dim, wilds_save_format=True, prefix="model."):
+def load_resnet50(
+    path, out_dim, wilds_save_format=True, prefix="model.", device="cuda"
+):
     model = torchvision.models.resnet50()
     model.fc = nn.Linear(model.fc.in_features, out_dim)
 
-    state = torch.load(path)
+    state = torch.load(path, map_location=torch.device(device))
 
     if wilds_save_format:
         state = state["algorithm"]
@@ -36,6 +38,7 @@ def load_featurized_resnet50(
     out_dim,
     featurizer_prefix="model.featurizer.",
     classifier_prefix="model.classifier.",
+    device="cuda",
 ):
     featurizer = torchvision.models.resnet50()
     featurizer_d_out = featurizer.fc.in_features
@@ -43,7 +46,7 @@ def load_featurized_resnet50(
 
     classifier = torch.nn.Linear(featurizer_d_out, out_dim)
 
-    state = torch.load(path)
+    state = torch.load(path, map_location=torch.device(device))
 
     state = state["algorithm"]
     featurizer_state = {}
@@ -59,11 +62,13 @@ def load_featurized_resnet50(
     return nn.Sequential(featurizer, classifier)
 
 
-def load_densenet121(path, out_dim, wilds_save_format=True, prefix="model."):
+def load_densenet121(
+    path, out_dim, wilds_save_format=True, prefix="model.", device="cuda"
+):
     model = torchvision.models.densenet121()
     model.classifier = nn.Linear(model.classifier.in_features, out_dim)
 
-    state = torch.load(path)
+    state = torch.load(path, map_location=torch.device(device))
 
     if wilds_save_format:
         state = state["algorithm"]
@@ -83,7 +88,11 @@ def load_densenet121(path, out_dim, wilds_save_format=True, prefix="model."):
 
 
 def load_featurized_densenet121(
-    path, out_dim, featurizer_prefix="featurizer.", classifier_prefix="classifier."
+    path,
+    out_dim,
+    featurizer_prefix="featurizer.",
+    classifier_prefix="classifier.",
+    device="cuda",
 ):
     featurizer = torchvision.models.densenet121()
     featurizer_d_out = featurizer.classifier.in_features
@@ -91,7 +100,7 @@ def load_featurized_densenet121(
 
     classifier = torch.nn.Linear(featurizer_d_out, out_dim)
 
-    state = torch.load(path)
+    state = torch.load(path, map_location=torch.device(device))
 
     state = state["algorithm"]
     featurizer_state = {}
@@ -106,6 +115,7 @@ def load_featurized_densenet121(
     classifier.load_state_dict(classifier_state)
     return nn.Sequential(featurizer, classifier)
 
+
 ########################################################################
 # Camelyon17
 ########################################################################
@@ -114,11 +124,12 @@ def camelyon17_pretrained_models(model_dir, Nseeds=-1):
     if Nseeds < 0:
         Nseeds = 10  # Set the number of available seeds
 
+    device = "cuda" if config["accelerator"] == "gpu" else config["accelerator"]
     shared_args = {
         "out_dim": config["n_classes"],
         "Nseeds": Nseeds,
         "config": config,
-        "args": {},
+        "args": {"device": device},
     }
 
     model_descriptions = []
@@ -286,7 +297,6 @@ def camelyon17_pretrained_models(model_dir, Nseeds=-1):
     return model_descriptions
 
 
-
 ########################################################################
 # iWildCam
 ########################################################################
@@ -295,11 +305,12 @@ def iwildcam_pretrained_models(model_dir, Nseeds=-1):
     if Nseeds < 0:
         Nseeds = 3  # Set the number of available seeds
 
+    device = "cuda" if config["accelerator"] == "gpu" else config["accelerator"]
     shared_args = {
         "out_dim": config["n_classes"],
         "Nseeds": Nseeds,
         "config": config,
-        "args": {},
+        "args": {"device": device},
     }
 
     model_descriptions = []
@@ -437,7 +448,6 @@ def iwildcam_pretrained_models(model_dir, Nseeds=-1):
     return model_descriptions
 
 
-
 ########################################################################
 # FMOW
 ########################################################################
@@ -446,11 +456,13 @@ def fmow_pretrained_models(model_dir, Nseeds=-1):
     if Nseeds < 0:
         Nseeds = 3  # Set the number of available seeds
 
+    device = "cuda" if config["accelerator"] == "gpu" else config["accelerator"]
+    
     shared_args = {
         "out_dim": config["n_classes"],
         "Nseeds": Nseeds,
         "config": config,
-        "args": {},
+        "args": {"device": device},
     }
 
     model_descriptions = []
@@ -617,7 +629,6 @@ def fmow_pretrained_models(model_dir, Nseeds=-1):
     return model_descriptions
 
 
-
 ########################################################################
 # RxRx1
 ########################################################################
@@ -626,11 +637,13 @@ def rxrx1_pretrained_models(model_dir, Nseeds=-1):
     if Nseeds < 0:
         Nseeds = 3  # Set the number of available seeds
 
+    device = "cuda" if config["accelerator"] == "gpu" else config["accelerator"]
+    
     shared_args = {
         "out_dim": config["n_classes"],
         "Nseeds": Nseeds,
         "config": config,
-        "args": {},
+        "args": {"device": device},
     }
 
     model_descriptions = []
