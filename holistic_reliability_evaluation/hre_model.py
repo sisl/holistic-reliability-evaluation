@@ -18,6 +18,7 @@ from utils import flatten_model, get_predefined_transforms
 
 # Set the precision to speed things up a bit
 torch.set_float32_matmul_precision("medium")
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 
 def swap_classifier(model, n_classes):
@@ -268,9 +269,39 @@ class HREModel(pl.LightningModule):
     def calibration(self, batch):
         raise NotImplementedError("Must be implemented by subclass")
 
+    # From: https://towardsdatascience.com/neural-network-calibration-using-pytorch-c44b7221a61
     def update_T(self):
+        print("Temperature scaling...")
         validation_data = self.val_dataloader()
-        
+        temperature = nn.Parameter(torch.ones(1).cuda())
+        criterion = nn.CrossEntropyLoss()
+        optimizer = torch.optim.LBFGS([temperature], lr=0.001, max_iter=10000, line_search_fn='strong_wolfe')
+        device = self.device
+
+        logits_list = []
+        labels_list = []
+
+        for hrebatch in validation_data:
+            batch = hrebatch["id"]
+            x, y = batch[0].to(device), batch[1].to(device)
+
+            self.model.eval()
+            with torch.no_grad():
+                logits_list.append(self.model(x))
+                labels_list.append(y)
+
+        # Create tensors
+        logits_list = torch.cat(logits_list).to(device)
+        labels_list = torch.cat(labels_list).to(device)
+
+        def _eval():
+            loss = criterion(logits_list/temperature, labels_list)
+            loss.backward()
+            return loss
+
+        optimizer.step(_eval)
+        self.T = temperature.item()
+        print("self.T: ", self.T)
 
 
     # We use AUROC as the default OOD detection metric
