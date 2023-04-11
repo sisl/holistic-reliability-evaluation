@@ -182,6 +182,12 @@ class HREModel(pl.LightningModule):
         self.optimizer = optimizer_options[config["optimizer"]]
         self.lr = config["lr"]
 
+        self.T = 1
+        if config["calibration_method"] == "none":
+            self.temperature_scale=False
+        elif config["calibration_method"] == "temperature_scaling":
+            self.temperature_scale=True
+
     ## Pytorch Lightning functions
     def configure_optimizers(self):
         # TODO: Learning rate scheduler?
