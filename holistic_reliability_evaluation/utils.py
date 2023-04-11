@@ -70,6 +70,10 @@ def get_predefined_transforms(transform_strings, config):
         elif transform_name == "pretrain_default":
             # Using pre-trained transforms
             transforms.append(getattr(get_model_weights(config["model"]), config["pretrained_weights"]).transforms())
+        elif transform_name == "randaug":
+            transforms.append(tfs.RandAugment()) #adjust parameters to comply with wilds?
+        elif transform_name == "augmix":
+            transforms.append(tfs.AugMix()) #adjust parameters to comply with wilds?
         else:
             raise ValueError(f"Unknown transform {transform_name}")
     
