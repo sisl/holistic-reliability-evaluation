@@ -205,6 +205,8 @@ class HREModel(pl.LightningModule):
         return loss
 
     def validation_step(self, val_batch, batch_idx):
+        if batch_idx==0:
+            self.update_T()
         return self.compute_all_needed_outputs(val_batch, batch_idx)
 
     def validation_epoch_end(self, validation_step_outputs):
@@ -265,6 +267,11 @@ class HREModel(pl.LightningModule):
 
     def calibration(self, batch):
         raise NotImplementedError("Must be implemented by subclass")
+
+    def update_T(self):
+        validation_data = self.val_dataloader()
+        
+
 
     # We use AUROC as the default OOD detection metric
     def ood_detection(self):
@@ -437,7 +444,7 @@ class ClassificationTask(HREModel):
         self.loss_fn = nn.CrossEntropyLoss(label_smoothing=config["label_smoothing"])
 
     def forward(self, x):
-        return self.model(x)
+        return self.model(x)/self.T #self.T will pull the T for this HRE model 
 
     # By default, we use a gradient based attack
     def adversarial_predictions(self, batch):
