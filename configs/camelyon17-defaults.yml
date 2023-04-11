@@ -23,7 +23,7 @@ devices: 1
 # Training params - (Many of these are likely going to be tuned)
 max_epochs: 15
 lr: 0.001
-train_batch_size: 1024
+batch_size: 1024
 optimizer: adam
 model: densenet121
 label_smoothing: 0.01
@@ -51,9 +51,8 @@ test_ood_datasets:
   - rxrx1-id_test
   - iwildcam-id_test
 val_dataset_length: 1024
-val_batch_size: 1024
 test_dataset_length: 1024
-num_adv: 100
+num_adv: 128
 w_perf: 0.2
 w_rob: 0.2
 w_sec: 0.2

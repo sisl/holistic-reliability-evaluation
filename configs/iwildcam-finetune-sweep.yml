@@ -16,7 +16,7 @@ parameters:
     values: [0.1, 0.01, 0.0]
   optimizer:
     values: [adam, sgd, adamw]
-  train_batch_size:
+  batch_size:
     values: [32, 64, 128]
   lr:
     distribution: log_uniform_values

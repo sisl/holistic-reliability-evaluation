@@ -119,8 +119,8 @@ def load_featurized_densenet121(
 ########################################################################
 # Camelyon17
 ########################################################################
-def camelyon17_pretrained_models(model_dir, Nseeds=-1):
-    config = load_config("../configs/camelyon17-defaults.yml")
+def camelyon17_pretrained_models(model_dir, Nseeds=-1, config="../configs/camelyon17-defaults.yml"):
+    config = load_config(config)
     if Nseeds < 0:
         Nseeds = 10  # Set the number of available seeds
 
@@ -300,8 +300,8 @@ def camelyon17_pretrained_models(model_dir, Nseeds=-1):
 ########################################################################
 # iWildCam
 ########################################################################
-def iwildcam_pretrained_models(model_dir, Nseeds=-1):
-    config = load_config("../configs/iwildcam-defaults.yml")
+def iwildcam_pretrained_models(model_dir, Nseeds=-1, config="../configs/iwildcam-defaults.yml"):
+    config = load_config(config)
     if Nseeds < 0:
         Nseeds = 3  # Set the number of available seeds
 
@@ -451,8 +451,8 @@ def iwildcam_pretrained_models(model_dir, Nseeds=-1):
 ########################################################################
 # FMOW
 ########################################################################
-def fmow_pretrained_models(model_dir, Nseeds=-1):
-    config = load_config("../configs/fmow-defaults.yml")
+def fmow_pretrained_models(model_dir, Nseeds=-1, config="../configs/fmow-defaults.yml"):
+    config = load_config(config)
     if Nseeds < 0:
         Nseeds = 3  # Set the number of available seeds
 
@@ -632,8 +632,8 @@ def fmow_pretrained_models(model_dir, Nseeds=-1):
 ########################################################################
 # RxRx1
 ########################################################################
-def rxrx1_pretrained_models(model_dir, Nseeds=-1):
-    config = load_config("../configs/rxrx1-defaults.yml")
+def rxrx1_pretrained_models(model_dir, Nseeds=-1, config="../configs/rxrx1-defaults.yml"):
+    config = load_config(config)
     if Nseeds < 0:
         Nseeds = 3  # Set the number of available seeds
 

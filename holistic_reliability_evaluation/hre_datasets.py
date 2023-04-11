@@ -7,15 +7,17 @@ import torchvision.transforms as tfs
 from torch.utils.data import random_split, Dataset, Subset
 
 import sys, os
+
 sys.path.append(os.path.dirname(__file__))
 from corruptions import validation_corruptions, test_corruptions
 
 # Generate a dataset that is just gaussian random noise (pre-normalized)
 def random_noise_dataset(items, size, channels):
-    Xtrain = torch.randn(items, channels, *size)
-    ytrain = torch.randn(items, 1)
-    md = torch.randn(items, 1)
+    Xtrain = torch.randn(items, channels, *size, device="cpu")
+    ytrain = torch.zeros(items, 1, device="cpu")
+    md = torch.zeros(items, 1, device="cpu")
     return torch.utils.data.TensorDataset(Xtrain, ytrain, md)
+
 
 # Load a wilds dataset and apply the appropriate transforms
 def load_wilds_dataset(
@@ -29,34 +31,41 @@ def load_wilds_dataset(
     transform = tfs.Compose([*corruptions, *transforms])
     return dataset.get_subset(split, transform=transform)
 
+
 # Parse the dataset name and load the appropriate dataset
-def load_dataset(data_dir, name, size, n_channels, transforms):
+def load_dataset(data_dir, name, size, n_channels, transforms, length=None):
     split_words = name.split("-")
     assert len(split_words) in [1, 2, 3]
-    
+
     dataset_name = split_words[0]
     if dataset_name == "gaussian_noise":
-        return random_noise_dataset(items=10000, size=size, channels=n_channels)
+        return random_noise_dataset(items=length, size=size, channels=n_channels)
     else:
         split = split_words[1]
         assert split in ["train", "val", "test", "id_val", "id_test"]
-        
+
         corruptions = []
         if len(split_words) == 3:
             assert split_words[2] in ["corruption1_val", "corruption1_test"]
             if split_words[2] == "corruption1_val":
-                corruptions=[tfs.RandomChoice(validation_corruptions(1))]
+                corruptions = [tfs.RandomChoice(validation_corruptions(1))]
             elif split_words[2] == "corruption1_test":
-                corruptions=[tfs.RandomChoice(test_corruptions(1))]
-            
+                corruptions = [tfs.RandomChoice(test_corruptions(1))]
+
     # For some reason camelyon17 only has id_val and rxrx1 only has id_test
     if dataset_name in ["camelyon17", "rxrx1"] and split in ["id_val", "id_test"]:
-        index = {"id_val" : 0, "id_test" : 1}[split]
-        split = {"camelyon17" : "id_val", "rxrx1" : "id_test"}[dataset_name]
-        dataset = load_wilds_dataset(dataset_name, data_dir, split, transforms, corruptions=corruptions)
-        return random_split(dataset, [0.5, 0.5], generator=torch.Generator().manual_seed(0))[index]
+        index = {"id_val": 0, "id_test": 1}[split]
+        split = {"camelyon17": "id_val", "rxrx1": "id_test"}[dataset_name]
+        dataset = load_wilds_dataset(
+            dataset_name, data_dir, split, transforms, corruptions=corruptions
+        )
+        return random_split(
+            dataset, [0.5, 0.5], generator=torch.Generator().manual_seed(0)
+        )[index]
     else:
-        return load_wilds_dataset(dataset_name, data_dir, split, transforms, corruptions=corruptions)
+        return load_wilds_dataset(
+            dataset_name, data_dir, split, transforms, corruptions=corruptions
+        )
 
 
 # Get a subset of a provided dataset, possibly by first randomizing the indices

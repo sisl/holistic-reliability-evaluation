@@ -11,12 +11,14 @@ import torchvision.transforms as tfs
 
 import multiprocessing
 import sys, os
+
 sys.path.append(os.path.dirname(__file__))
 from hre_datasets import HREDatasets, load_dataset
 from utils import flatten_model, get_predefined_transforms
 
 # Set the precision to speed things up a bit
 torch.set_float32_matmul_precision("medium")
+
 
 def swap_classifier(model, n_classes):
     if isinstance(model, torchvision.models.DenseNet):
@@ -91,6 +93,7 @@ class HREModel(pl.LightningModule):
         both_transforms = [tfs.Compose([*self.train_transforms, *self.eval_transforms])]
 
         # Load the train dataset
+        print("Loading train dataset...")
         self.train_dataset = load_dataset(
             data_dir,
             config["train_dataset"],
@@ -100,48 +103,55 @@ class HREModel(pl.LightningModule):
         )
 
         # Build the val and test datasets
+        args = {
+            "size": self.size,
+            "n_channels": self.n_channels,
+            "transforms": self.eval_transforms,
+        }
+
+        # Validation datasets
+        val_length = config["val_dataset_length"]
+        val_args = {**args, "length": val_length}
+        print("Loading id-val dataset...")
         val = load_dataset(
             data_dir,
             config["val_id_dataset"],
-            self.size,
-            self.n_channels,
-            self.eval_transforms,
+            **val_args,
         )
-        val_ds_datasets = [
-            load_dataset(
-                data_dir, name, self.size, self.n_channels, self.eval_transforms
-            )
-            for name in config["val_ds_datasets"]
-        ]
-        val_ood_datasets = [
-            load_dataset(
-                data_dir, name, self.size, self.n_channels, self.eval_transforms
-            )
-            for name in config["val_ood_datasets"]
-        ]
+        val_ds_datasets = []
+        for name in config["val_ds_datasets"]:
+            print("Loading val ds dataset: ", name, "...")
+            val_ds_datasets.append(load_dataset(data_dir, name, **val_args))
+        val_ood_datasets = []
+        for name in config["val_ood_datasets"]:
+            print("Loading val ood dataset: ", name, "...")
+            val_ood_datasets.append(load_dataset(data_dir, name, **val_args))
+
         self.val_datasets = HREDatasets(
-            val, val_ds_datasets, val_ood_datasets, length=config["val_dataset_length"]
+            val, val_ds_datasets, val_ood_datasets, length=val_length
         )
 
+        # Test datasets
+        test_length = config["test_dataset_length"]
+        test_args = {**args, "length": test_length}
+
+        print("Loading id-test dataset...")
         test = load_dataset(
             data_dir,
             config["test_id_dataset"],
-            self.size,
-            self.n_channels,
-            self.eval_transforms,
+            **test_args,
         )
-        test_ds_datasets = [
-            load_dataset(
-                data_dir, name, self.size, self.n_channels, self.eval_transforms
-            )
-            for name in config["test_ds_datasets"]
-        ]
-        test_ood_datasets = [
-            load_dataset(
-                data_dir, name, self.size, self.n_channels, self.eval_transforms
-            )
-            for name in config["test_ood_datasets"]
-        ]
+
+        test_ds_datasets = []
+        for name in config["test_ds_datasets"]:
+            print("Loading test ds dataset: ", name, "...")
+            test_ds_datasets.append(load_dataset(data_dir, name, **test_args))
+
+        test_ood_datasets = []
+        for name in config["test_ood_datasets"]:
+            print("Loading test ood dataset: ", name, "...")
+            test_ood_datasets.append(load_dataset(data_dir, name, **test_args))
+
         self.test_datasets = HREDatasets(
             test,
             test_ds_datasets,
@@ -168,8 +178,7 @@ class HREModel(pl.LightningModule):
 
         # Set up remaining configuration parameters
         self.num_workers = min(multiprocessing.cpu_count(), config["max_num_workers"])
-        self.val_batch_size = config["val_batch_size"]
-        self.train_batch_size = config["train_batch_size"]
+        self.batch_size = config["batch_size"]
         self.optimizer = optimizer_options[config["optimizer"]]
         self.lr = config["lr"]
 
@@ -190,20 +199,26 @@ class HREModel(pl.LightningModule):
         return loss
 
     def validation_step(self, val_batch, batch_idx):
+        return self.compute_all_needed_outputs(val_batch, batch_idx)
+
+    def validation_epoch_end(self, validation_step_outputs):
         self.log_dict(
             self.hre_info(
-                val_batch,
+                validation_step_outputs,
                 "val",
-                self.config[f"val_id_dataset"],
-                self.config[f"val_ds_datasets"],
-                self.config[f"val_ood_datasets"],
+                self.config["val_id_dataset"],
+                self.config["val_ds_datasets"],
+                self.config["val_ood_datasets"],
             )
         )
 
     def test_step(self, test_batch, batch_idx):
+        return self.compute_all_needed_outputs(test_batch, batch_idx)
+
+    def test_epoch_end(self, test_step_outputs):
         self.log_dict(
             self.hre_info(
-                test_batch,
+                test_step_outputs,
                 "test",
                 self.config["test_id_dataset"],
                 self.config["test_ds_datasets"],
@@ -214,7 +229,7 @@ class HREModel(pl.LightningModule):
     def train_dataloader(self):
         return DataLoader(
             self.train_dataset,
-            batch_size=self.train_batch_size,
+            batch_size=self.batch_size,
             num_workers=self.num_workers,
             shuffle=True,
         )
@@ -222,104 +237,140 @@ class HREModel(pl.LightningModule):
     def val_dataloader(self):
         return DataLoader(
             self.val_datasets,
-            batch_size=self.val_batch_size,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
         )
 
     def test_dataloader(self):
         return DataLoader(
             self.test_datasets,
-            batch_size=self.val_batch_size,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
         )
 
     ## The following functions define the various reliability metrics and should either be implmented by a sublcass, or use members that should be supplied by a subclass
-    def performance(self, batch):
+    def predictions(self, batch):
         x, y = batch[0], batch[1]
-        pred = self(x)
-        return self.performance_metric(pred, y).item()
+        pred = self.model(x)
+        return {"pred": pred, "y": y}
 
-    def adversarial_performance(self, batch):
+    def adversarial_predictions(self, batch):
         raise NotImplementedError("Must be implemented by subclass")
 
     def calibration(self, batch):
         raise NotImplementedError("Must be implemented by subclass")
 
     # We use AUROC as the default OOD detection metric
-    def ood_detection(self, id_batch, ood_batches):
-        metrics = ood.utils.OODMetrics()
-        target = torch.ones(id_batch[0].shape[0])
-        metrics.update(self.ood_detector(id_batch[0]), target)
-        for ood_batch in ood_batches:
-            metrics.update(self.ood_detector(ood_batch[0]), -1 * target)
-        ood_metrics = metrics.compute()
+    def ood_detection(self):
+        ood_metrics = self.metrics.compute()
         auroc = ood_metrics["AUROC"]
-        return max(
-            auroc, 1 - auroc
-        )  # We could threshold in either direction, so we take the best outcome
+        # We could threshold in either direction, so we take the best outcome
+        return max(auroc, 1 - auroc)
+
+    def compute_all_needed_outputs(self, batch, batch_idx):
+        with torch.inference_mode():
+            # Compute predictions on id and ds datasets
+            predictions = {
+                "id": self.predictions(batch["id"]),
+                "ds": [self.predictions(b) for b in batch["ds"]],
+            }
+
+            # OOD detection
+            if batch_idx == 0:
+                self.metrics = ood.utils.OODMetrics()
+
+            target = torch.ones(batch["id"][0].shape[0])
+            self.metrics.update(self.ood_detector(batch["id"][0]), target)
+            for ood_batch in batch["ood"]:
+                self.metrics.update(self.ood_detector(ood_batch[0]), -1 * target)
+
+        # Compute adversarial predictions
+        if batch_idx * self.batch_size < self.config["num_adv"]:
+            y_adv = self.adversarial_predictions(batch["id"])
+            predictions["id_adv"] = y_adv
+
+        return predictions
 
     ## Thesese functions use the above functions to compute the HRE score
-    def performance_info(self, id_batch, prefix):
-        perf = self.performance(id_batch)
+    def performance_info(self, perf, prefix):
         perf_norm = (perf - self.min_performance) / (
             self.max_performance - self.min_performance
         )
         return {prefix + "_performance": perf, prefix + "_performance_norm": perf_norm}
 
-    def robustness_info(self, ds_batches, id_performance, prefix, ds_names):
+    def robustness_info(self, ds_perfs, id_performance, prefix, ds_names):
         if id_performance == 0:
             id_performance = 1e-6
         results = {prefix + "_robustness": 0.0, prefix + "_ds_performance": 0.0}
-        for name, batch in zip(ds_names, ds_batches):
-            performance = self.performance(batch)
-            robustness = min(1.0, performance / id_performance)
-            results[name + "_performance"] = performance
+        for name, perf in zip(ds_names, ds_perfs):
+            robustness = min(1.0, perf / id_performance)
+            results[name + "_performance"] = perf
             results[name + "_robustness"] = robustness
-            results[prefix + "_ds_performance"] += performance / len(ds_batches)
-            results[prefix + "_robustness"] += robustness / len(ds_batches)
+            results[prefix + "_ds_performance"] += perf / len(ds_perfs)
+            results[prefix + "_robustness"] += robustness / len(ds_perfs)
 
         return results
 
-    def security_info(self, id_batch, id_performance, prefix, id_name):
+    def security_info(self, adv_performance, id_performance, prefix, id_name):
         if id_performance == 0:
             id_performance = 1e-6
 
-        adv_performance = self.adversarial_performance(id_batch)
         security = min(1.0, adv_performance / id_performance)
         return {
             id_name + "_adv_performance": adv_performance,
             prefix + "_security": security,
         }
 
-    def calibration_info(self, id_batch, ds_batches, prefix, id_name, ds_names):
+    def calibration_info(self, id_cal, ds_cals, prefix, id_name, ds_names):
         results = {prefix + "_calibration": 0.0}
-        for name, batch in zip([id_name, *ds_names], [id_batch, *ds_batches]):
-            calibration = self.calibration(batch)
+        for name, calibration in zip([id_name, *ds_names], [id_cal, *ds_cals]):
             results[name + "_calibration"] = calibration
-            results[prefix + "_calibration"] += calibration / (len(ds_batches) + 1)
+            results[prefix + "_calibration"] += calibration / (len(ds_cals) + 1)
 
         return results
 
-    def ood_detection_info(self, id_batch, ood_batches, prefix, ood_names):
-        results = {prefix + "_ood_detection": self.ood_detection(id_batch, ood_batches)}
-        # for name, batch in zip(ood_names, ood_batches):
-        #     ood_detection = self.ood_detection(id_batch, batch)
-        #     results[name + "_ood_detection"] = ood_detection
-        #     results[prefix + "_ood_detection"] += ood_detection / len(ood_batches)
+    def ood_detection_info(self, ood_detection_metric, prefix):
+        return {prefix + "_ood_detection": ood_detection_metric}
 
-        return results
+    def hre_info(self, outputs, prefix, id_name, ds_names, ood_names):
+        # ID
+        pred = torch.cat([d["id"]["pred"] for d in outputs])
+        y = torch.cat([d["id"]["y"] for d in outputs])
+        id_perf = self.performance_metric(pred, y).item()
+        performance_results = self.performance_info(id_perf, prefix)
 
-    def hre_info(self, hrebatch, prefix, id_name, ds_names, ood_names):
-        performance_results = self.performance_info(hrebatch["id"], prefix)
-        id_perf = performance_results[prefix + "_performance"]
-        robustness_results = self.robustness_info(
-            hrebatch["ds"], id_perf, prefix, ds_names
-        )
-        security_results = self.security_info(hrebatch["id"], id_perf, prefix, id_name)
+        # DS
+        ds_perfs = []
+        for i in range(len(self.config[f"val_ds_datasets"])):
+            pred = torch.cat([d["ds"][i]["pred"] for d in outputs])
+            y = torch.cat([d["ds"][i]["y"] for d in outputs])
+            perf = self.performance_metric(pred, y).item()
+            ds_perfs.append(perf)
+        robustness_results = self.robustness_info(ds_perfs, id_perf, prefix, ds_names)
+
+        # Adv
+        adv_outputs = [out for out in filter(lambda d: "id_adv" in d.keys(), outputs)]
+        adv_pred = torch.cat([d["id_adv"]["pred"] for d in adv_outputs])
+        adv_y = torch.cat([d["id_adv"]['y'] for d in adv_outputs])
+        adv_perf = self.performance_metric(adv_pred, adv_y).item()
+        security_results = self.security_info(adv_perf, id_perf, prefix, id_name)
+
+        # Calibration
+        id_cal = self.calibration(pred, y)
+        ds_cals = []
+        for i in range(len(self.config[f"val_ds_datasets"])):
+            pred = torch.cat([d["ds"][i]["pred"] for d in outputs])
+            y = torch.cat([d["ds"][i]["y"] for d in outputs])
+            cal = self.calibration(pred, y)
+            ds_cals.append(cal)
         calibration_results = self.calibration_info(
-            hrebatch["id"], hrebatch["ds"], prefix, id_name, ds_names
+            id_cal, ds_cals, prefix, id_name, ds_names
         )
-        ood_results = self.ood_detection_info(
-            hrebatch["id"], hrebatch["ood"], prefix, ood_names
-        )
+
+        # OOD detection
+        ood_metric = self.ood_detection()
+        ood_results = self.ood_detection_info(ood_metric, prefix)
+
         hre_score = (
             performance_results[prefix + "_performance_norm"] * self.w_perf
             + robustness_results[prefix + "_robustness"] * self.w_rob
@@ -383,7 +434,7 @@ class ClassificationTask(HREModel):
         return self.model(x)
 
     # By default, we use a gradient based attack
-    def adversarial_performance(self, batch):
+    def adversarial_predictions(self, batch):
         if self.num_adv == 0:
             return -1.0
 
@@ -397,18 +448,12 @@ class ClassificationTask(HREModel):
         if self.n_classes < 4:
             adversary.attacks_to_run = ["apgd-ce", "fab-t", "square"]
 
-        # Only use self.num_adv samples
-        x = batch[0][: self.num_adv, ...]
-        y = batch[1][: self.num_adv]
-
-        # Run the attack and comput adversarial accuracy
+        # Run the attack and return the perturbed labels
+        x, y = batch[0], batch[1]
         _, yadv = adversary.run_standard_evaluation(x, y, return_labels=True)
-        adv_acc = sum(y == yadv).cpu().item() / y.size(0)
-        return adv_acc
+        return {"pred": yadv, "y": y}
 
     # For classification we use ECE as the default calibration metric (and need to softmax it)
-    def calibration(self, batch):
-        x, y = batch[0], batch[1]
-        logits = self(x)
-        ece = self.calibration_metric(logits.softmax(1), y).item()
+    def calibration(self, pred, y):
+        ece = self.calibration_metric(pred.softmax(1), y).item()
         return 1 - ece / 0.5
