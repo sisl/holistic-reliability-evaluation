@@ -163,7 +163,7 @@ class HREModel(pl.LightningModule):
         ]
         both_transforms = [tfs.Compose([*self.train_transforms, *self.eval_transforms])]
 
-        self.adversarial_training_method = torchattacks.PGD(self)
+        # self.adversarial_training_method = torchattacks.PGD(self)
 
         # Load the train dataset
         print("Loading train dataset...")
@@ -265,11 +265,21 @@ class HREModel(pl.LightningModule):
 
     ## Pytorch Lightning functions
     def configure_optimizers(self):
-        # TODO: Learning rate scheduler?
 
-        return self.optimizer(
+        """From 'A simple fine-tuning is all you need' by Jeddi et al 2020
+        http://arxiv.org/abs/2012.13628"""
+        def lr_func(epoch):
+            if epoch <= 5:
+                return epoch
+            else:
+                return 5*(epoch-5)*1/2
+
+        opt =  self.optimizer(
             filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr
         )
+        scheduler = torch.optim.lr_scheduler.LambdaLR(opt, lr_func)
+        return {"optimizer": opt, "lr_scheduler": scheduler}
+
 
     def training_step(self, batch, batch_idx):
         x, y = batch[0], batch[1]
