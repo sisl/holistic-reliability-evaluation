@@ -8,7 +8,6 @@ from pytorch_lightning.loggers import WandbLogger, CSVLogger
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning import seed_everything
 import wandb
-import torch, torchattacks
 
 # Load the function to get the model type from the algorithm string
 sys.path.append(os.path.join(os.path.dirname(__file__)))

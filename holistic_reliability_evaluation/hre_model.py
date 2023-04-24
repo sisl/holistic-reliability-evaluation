@@ -530,7 +530,7 @@ class ClassificationTask(HREModel):
             freeze_weights(self.model, config["unfreeze_k_layers"])
 
 
-        atk = torchattacks.AutoAttack(self.model, eps=3/255)
+        atk = torchattacks.PGD(self.model, eps=3/255)
         atk.set_normalization_used(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         atk.set_device(torch.device('cuda'))
         self.adversarial_training_method = atk
