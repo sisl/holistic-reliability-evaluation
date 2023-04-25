@@ -1,0 +1,35 @@
+[tool.poetry]
+name = "holistic-reliability-evaluation"
+version = "0.3.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [{include = "holistic_reliability_evaluation"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+matplotlib = "^3.6"
+numpy = "^1.21"
+Pillow = "^9.5"
+pytorch_lightning = "1.8"
+pytorch_ood = "^0.1"
+PyYAML = "^6.0"
+scikit_image = "^0.19"
+scipy = "^1.7"
+setuptools = "^65.6"
+torch = "^1.13"
+torchmetrics = "^0.10"
+torchvision = "^0.14"
+wand = "^0.6"
+wandb = "^0.13"
+wilds = "2.0"
+ipython = "^8.12.0"
+autoattack = {git = "https://github.com/fra31/auto-attack.git"}
+opencv-python = "^4.7.0.72"
+torchattacks = "^3.4.0"
+pandas = "<2.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
