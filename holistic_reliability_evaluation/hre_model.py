@@ -8,48 +8,118 @@ from autoattack import AutoAttack
 import torchvision
 from torchvision.models import get_model, get_model_weights
 import torchvision.transforms as tfs
+import open_clip
 
 import multiprocessing
 import sys, os
 
 sys.path.append(os.path.dirname(__file__))
 from hre_datasets import HREDatasets, load_dataset
-from utils import flatten_model, get_predefined_transforms
+import mae
+from mae.models_vit import VisionTransformer as MAE_VisionTransformer
+from utils import *
 
 # Set the precision to speed things up a bit
 torch.set_float32_matmul_precision("medium")
+
+torch.multiprocessing.set_sharing_strategy("file_system")
 
 
 def swap_classifier(model, n_classes):
     if isinstance(model, torchvision.models.DenseNet):
         model.classifier = nn.Linear(model.classifier.in_features, n_classes)
+    if (
+        isinstance(model, torchvision.models.EfficientNet)
+        or isinstance(model, torchvision.models.ConvNeXt)
+        or isinstance(model, torchvision.models.MaxVit)
+    ):
+        model.classifier[-1] = nn.Linear(model.classifier[-1].in_features, n_classes)
+    if isinstance(model, torchvision.models.SwinTransformer):
+        model.head = nn.Linear(model.head.in_features, n_classes)
     if isinstance(model, torchvision.models.VisionTransformer):
         model.heads[-1] = nn.Linear(model.heads[-1].in_features, n_classes)
     if isinstance(model, torchvision.models.ResNet):
         model.fc = nn.Linear(model.fc.in_features, n_classes)
 
 
+def construct_model(config):
+    n_classes = config["n_classes"]
+    model = config["model"]
+    weights = config["pretrained_weights"]
+    if config["model_source"] == "torchvision":
+        if weights is None:
+            model = get_model(model, num_classes=n_classes)
+        else:
+            weights = getattr(get_model_weights(model), weights)
+            model = get_model(model, weights=weights)
+            swap_classifier(model, n_classes)
+    elif config["model_source"] == "open_clip":
+        clip = open_clip.create_model(model_str_to_clip(model), weights)
+        classifier = nn.Linear(clip.token_embedding.embedding_dim, n_classes)
+        model = CLIPClassifier(clip, classifier)
+    elif config["model_source"] == "mae":
+        assert weights == "DEFAULT"
+        model = load_mae(model_str_to_mae(model), n_classes)
+    else:
+        raise ValueError(f"Unknown model source {config['model_source']}")
+    return model
+
+
 def freeze_weights(model, nlayers):
+    assert nlayers >= 1
+
     # Start by freezing all the layers
     for param in model.parameters():
         param.requires_grad = False
 
-    # Unfreeze the classifier layer
+    # Then for each model type, we unfreeze the appropriate layers
     if isinstance(model, torchvision.models.DenseNet):
-        for param in model.classifier.parameters():
-            param.requires_grad = True
+        raise NotImplementedError("ResNet not implemented yet")
+        # for param in model.classifier.parameters():
+        #     param.requires_grad = True
     if isinstance(model, torchvision.models.VisionTransformer):
-        assert nlayers >= 1
-        # unfreeze the first layer
         for param in model.heads[-1].parameters():
             param.requires_grad = True
-        # unfreeze the remaining k layers
-        for i in range(nlayers - 1):
-            for param in model.encoder.layers[-(i - 1)].parameters():
+        for i in range(min(nlayers, len(model.encoder.layers)) - 1):
+            for param in model.encoder.layers[-(i + 1)].parameters():
                 param.requires_grad = True
     if isinstance(model, torchvision.models.ResNet):
-        for param in model.fc.parameters():
+        raise NotImplementedError("ResNet not implemented yet")
+        # for param in model.fc.parameters():
+        #     param.requires_grad = True
+    if isinstance(model, CLIPClassifier):
+        for param in model.classifier.parameters():
             param.requires_grad = True
+        for i in range(min(nlayers, len(model.clip.visual.transformer.resblocks)) - 1):
+            for param in model.clip.visual.transformer.resblocks[-(i + 1)].parameters():
+                param.requires_grad = True
+    if isinstance(model, MAE_VisionTransformer):
+        for param in model.head.parameters():
+            param.requires_grad = True
+        for i in range(min(nlayers, len(model.blocks)) - 1):
+            for param in model.blocks[-(i + 1)].parameters():
+                param.requires_grad = True
+    if isinstance(model, torchvision.models.MaxVit):
+        for param in model.classifier.parameters():
+            param.requires_grad = True
+        for i in range(min(nlayers, len(model.blocks)) - 1):
+            index = min(i+1, len(model.blocks))
+            for param in model.blocks[-(i + 1)].parameters():
+                param.requires_grad = True
+    if isinstance(model, torchvision.models.SwinTransformer):
+        for param in model.head.parameters():
+            param.requires_grad = True
+        for i in range(min(nlayers, len(model.features)) - 1):
+            for param in model.features[-(i + 1)].parameters():
+                param.requires_grad = True
+    if isinstance(model, torchvision.models.ConvNeXt) or isinstance(
+        model, torchvision.models.EfficientNet
+    ):
+        for param in model.classifier.parameters():
+            param.requires_grad = True
+        for i in range(min(nlayers, len(model.features)) - 1):
+            for param in model.features[-(i + 1)].parameters():
+                param.requires_grad = True
 
 
 # Options for the selection of the optimizer
@@ -349,10 +419,15 @@ class HREModel(pl.LightningModule):
         robustness_results = self.robustness_info(ds_perfs, id_perf, prefix, ds_names)
 
         # Adv
-        adv_outputs = [out for out in filter(lambda d: "id_adv" in d.keys(), outputs)]
-        adv_pred = torch.cat([d["id_adv"]["pred"] for d in adv_outputs])
-        adv_y = torch.cat([d["id_adv"]['y'] for d in adv_outputs])
-        adv_perf = self.performance_metric(adv_pred, adv_y).item()
+        if self.num_adv > 0:
+            adv_outputs = [
+                out for out in filter(lambda d: "id_adv" in d.keys(), outputs)
+            ]
+            adv_pred = torch.cat([d["id_adv"]["pred"] for d in adv_outputs])
+            adv_y = torch.cat([d["id_adv"]["y"] for d in adv_outputs])
+            adv_perf = self.performance_metric(adv_pred, adv_y).item()
+        else:
+            adv_perf = 0.0
         security_results = self.security_info(adv_perf, id_perf, prefix, id_name)
 
         # Calibration
@@ -396,22 +471,13 @@ class ClassificationTask(HREModel):
         super().__init__(config, *args, **kwargs)
 
         # Load the model, possibly with pre-trained weights
-        if model is None:
-            if (
-                "pretrained_weights" not in config
-                or config["pretrained_weights"] == "none"
-            ):
-                self.model = get_model(config["model"], num_classes=self.n_classes)
-            else:
-                weights = getattr(
-                    get_model_weights(config["model"]), config["pretrained_weights"]
-                )
-                self.model = get_model(config["model"], weights=weights)
-                swap_classifier(self.model, self.n_classes)
-                if config["freeze_weights"]:
-                    freeze_weights(self.model, config["unfreeze_k_layers"])
-        else:
-            self.model = model
+        self.model = construct_model(config) if model is None else model
+
+        # Freeze parameters for finetuning
+        if config["freeze_weights"] and config["unfreeze_k_layers"] != "all":
+            print(config["unfreeze_k_layers"])
+            print(config["freeze_weights"] and config["unfreeze_k_layers"] != "all")
+            freeze_weights(self.model, config["unfreeze_k_layers"])
 
         # Set the defaults for a classification task
         # By default we set the performance metric to accuracy

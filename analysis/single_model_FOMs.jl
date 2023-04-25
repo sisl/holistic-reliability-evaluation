@@ -126,11 +126,26 @@ function scatter_scores(dataset_results; metric="val_hre_score", p=plot())
     p
 end
 
+
+
 # results_dir = "results/evaluation_results"
 results_dir = "results/evaluation_results"
 results = load_results(results_dir)
 datasets = ["camelyon17", "iwildcam", "fmow", "rxrx1"]
 dataset_names = ["Camelyon17", "iWildCam", "fMoW", "RxRx1"]
+
+finetune_results_dir = "/mnt/data/acorso/results/"
+fine_tune_results = load_results(finetune_results_dir, self_trained=true)
+
+# Put all the results together
+all_results = deepcopy(results)
+ft_results = Dict("iwildcam" => Dict())
+# Combine dictionaries
+for (k, v) in fine_tune_results["iwildcam-train"]
+    all_results["iwildcam"][k] = v
+    ft_results["iwildcam"][k] = v
+end
+
 
 ## Demonstrate the drop in performance and calibration due to domain shifts
 # Performance
@@ -139,11 +154,21 @@ axis_labels = ["ID Performance", "DS-Val Performance", "DS-Test Performance", "D
 parallel_coord_mean_std(results, datasets, dataset_names, syms_fn, axis_labels, plot(title="Performance Drop Under Domain Shift", ylabel="Performance", legend=:outertopright, xrotation=45, bottommargin=10Plots.mm, dpi=300))
 savefig("analysis/figures/performance_drop.png")
 
+# fine tune
+p = parallel_coord_mean_std(results,  ["iwildcam"], ["iWildCam"], syms_fn, axis_labels, plot(title="Performance Drop Under Domain Shift", ylabel="Performance", legend=:outertopright, xrotation=45, bottommargin=10Plots.mm, dpi=300))
+parallel_coord_mean_std(ft_results, ["iwildcam"], ["iWildCam-FT"], syms_fn, axis_labels, p)
+savefig("analysis/figures/ft-performance_drop.png")
+
 # Calibration
 syms_fn(d) = ["$d-id_val_calibration", "$d-val_calibration", "$d-test_calibration", "$d-id_val-corruption1_val_calibration", "$d-id_test-corruption1_test_calibration"]
 axis_labels = ["ID Calibration", "DS-Val Calibration", "DS-Test Calibration", "DS-C1-Val Calibration", "DS-C1-Test Calibration"]
 parallel_coord_mean_std(results, datasets, dataset_names, syms_fn, axis_labels, plot(title="Calibration Drop Under Domain Shift", ylabel="Calibration", legend=:outertopright, xrotation=45, bottommargin=10Plots.mm, dpi=300, markershape=:circle))
 savefig("analysis/figures/calibration_drop.png")
+
+#fine tune
+p = parallel_coord_mean_std(results,  ["iwildcam"], ["iWildCam"], syms_fn, axis_labels, plot(title="Calibration Drop Under Domain Shift", ylabel="Calibration", legend=:outertopright, xrotation=45, bottommargin=10Plots.mm, dpi=300, markershape=:circle))
+parallel_coord_mean_std(ft_results, ["iwildcam"], ["iWildCam-FT"], syms_fn, axis_labels, p)
+savefig("analysis/figures/ft-calibration_drop.png")
 
 
 ## Compare the correlation between metrics
@@ -152,6 +177,7 @@ p2 = plot_metric_correlations(results["camelyon17"], prefix="test", title="Metri
 
 p3 = plot_metric_correlations(results["iwildcam"], title="Metric Correlations on iWildCam (Val)")
 p4 = plot_metric_correlations(results["iwildcam"], prefix="test", title="Metric Correlations on iWildCam (Test)")
+plot_metric_correlations(fine_tune_results["iwildcam-train"], prefix="test")
 
 p5 = plot_metric_correlations(results["fmow"], title="Metric Correlations on FMOW (Val)")
 p6 = plot_metric_correlations(results["fmow"], prefix="test", title="Metric Correlations on FMOW (Test)")
@@ -171,6 +197,11 @@ p4 = plot_relationship(results["rxrx1"], "val_performance", "test_performance", 
 plot(p1, p2, p3, p4, layout=(1, 4), size=(4*400, 400), dpi=300, left_margin=10Plots.mm, bottom_margin=10Plots.mm)
 savefig("analysis/figures/test_vs_val_accuracy.png")
 
+## FT comparison
+p1 = plot_relationship(results["iwildcam"], "val_performance", "test_performance", p=plot(title="iWildCam", xlabel="ID Val Performance", ylabel="ID Test Performance"), show_yeqx=true, scale_yeqx=false)
+p2 = plot_relationship(ft_results["iwildcam"], "val_performance", "test_performance", p=plot(title="iWildCam", xlabel="ID Val Performance", ylabel="ID Test Performance"), show_yeqx=true, scale_yeqx=false)
+
+
 # Performance vs ds performance
 p1 = plot_relationship(results["camelyon17"], "test_performance", "test_ds_performance", p=plot(title="Camelyon17", xlabel="ID Test Performance", ylabel="DS Test Performance"), show_yeqx=true, scale_yeqx=false)
 p2 = plot_relationship(results["iwildcam"], "test_performance", "test_ds_performance", p=plot(title="iWildCam", xlabel="ID Test Performance", ylabel="DS Test Performance"), show_yeqx=true, scale_yeqx=false)
@@ -178,6 +209,9 @@ p3 = plot_relationship(results["fmow"], "test_performance", "test_ds_performance
 p4 = plot_relationship(results["rxrx1"], "test_performance", "test_ds_performance", p=plot(title="RxRx1", xlabel="ID Test Performance", ylabel="DS Test Performance"), show_yeqx=true, scale_yeqx=false)
 plot(p1, p2, p3, p4, layout=(1, 4), size=(4*400, 400), dpi=300, left_margin=10Plots.mm, bottom_margin=10Plots.mm)
 savefig("analysis/figures/ds_vs_id_performance")
+
+p1 = plot_relationship(results["iwildcam"], "test_performance", "test_ds_performance", p=plot(title="iWildCam", xlabel="ID Test Performance", ylabel="DS Test Performance"), show_yeqx=true, scale_yeqx=false)
+p2 = plot_relationship(ft_results["iwildcam"], "test_performance", "test_ds_performance", p=plot(title="iWildCam", xlabel="ID Test Performance", ylabel="DS Test Performance"), show_yeqx=true, scale_yeqx=false)
 
 # DS calibration vs ID calibration
 p1 = plot_relationship(results["camelyon17"], "camelyon17-id_val_calibration", "camelyon17-test_calibration", p=plot(title="Camelyon17", xlabel="ID Test Calibration", ylabel="DS Test Calibration"), show_yeqx=true, scale_yeqx=false)
@@ -187,12 +221,25 @@ p4 = plot_relationship(results["rxrx1"], "rxrx1-id_val_calibration", "rxrx1-test
 plot(p1, p2, p3, p4, layout=(1, 4), size=(4*400, 400), dpi=300, left_margin=10Plots.mm, bottom_margin=10Plots.mm)
 savefig("analysis/figures/ds_vs_id_calibration")
 
+p1 = plot_relationship(results["iwildcam"], "iwildcam-id_val_calibration", "iwildcam-test_calibration", p=plot(title="iWildCam", xlabel="ID Test Calibration", ylabel="DS Test Calibration"), show_yeqx=true, scale_yeqx=false)
+p2 = plot_relationship(ft_results["iwildcam"], "iwildcam-id_val_calibration", "iwildcam-test_calibration", p=plot(title="iWildCam", xlabel="ID Test Calibration", ylabel="DS Test Calibration"), show_yeqx=true, scale_yeqx=false)
+
+
 # Performance and robustness
 p1 = plot_relationship(results["camelyon17"], "test_performance", "test_robustness", p=plot(title="Camelyon17", xlabel="ID Test Performance", ylabel="Test Robustness"))
 p2 = plot_relationship(results["iwildcam"], "test_performance", "test_robustness", p=plot(title="iWildCam", xlabel="ID Test Performance", ylabel="Test Robustness"))
 p3 = plot_relationship(results["fmow"], "test_performance", "test_robustness", p=plot(title="fMoW", xlabel="ID Test Performance", ylabel="Test Robustness"))
 p4 = plot_relationship(results["rxrx1"], "test_performance", "test_robustness", p=plot(title="RxRx1", xlabel="ID Test Performance", ylabel="Test Robustness"))
 plot(p1, p2, p3, p4, layout=(1, 4), size=(4*400, 400), dpi=300, left_margin=10Plots.mm, bottom_margin=10Plots.mm)
+
+p1 = plot_relationship(results["iwildcam"], "test_performance", "test_robustness", p=plot(title="iWildCam", xlabel="ID Test Performance", ylabel="Test Robustness"))
+p2 = plot_relationship(ft_results["iwildcam"], "test_performance", "test_robustness", p=plot(title="iWildCam", xlabel="ID Test Performance", ylabel="Test Robustness"))
+
+
+p1 = plot_relationship(results["iwildcam"], "test_robustness", "test_calibration", p=plot(title="iWildCam", xlabel="Test Robustness", ylabel="Test Calibration"))
+p2 = plot_relationship(ft_results["iwildcam"], "test_robustness", "test_calibration", p=plot(title="iWildCam", xlabel="Test Robustness", ylabel="Test Calibration"))
+
+
 
 # Performance and calibration
 p1 = plot_relationship(results["camelyon17"], "test_performance", "test_calibration", p=plot(title="Camelyon17", xlabel="ID Test Performance", ylabel="Test Calibration"))
@@ -202,6 +249,10 @@ p4 = plot_relationship(results["rxrx1"], "test_performance", "test_calibration",
 plot(p1, p2, p3, p4, layout=(1, 4), size=(4*400, 400), dpi=300, left_margin=10Plots.mm, bottom_margin=10Plots.mm)
 savefig("analysis/figures/calibration_vs_performance.png")
 
+p1 = plot_relationship(results["iwildcam"], "test_performance", "test_calibration", p=plot(title="iWildCam", xlabel="ID Test Performance", ylabel="Test Calibration"))
+p2 = plot_relationship(ft_results["iwildcam"], "test_performance", "test_calibration", p=plot(title="iWildCam", xlabel="ID Test Performance", ylabel="Test Calibration"))
+
+
 # Performance and security
 p1 = plot_relationship(results["camelyon17"], "test_performance", "test_security", p=plot(title="Camelyon17", xlabel="ID Test Performance", ylabel="Test Security"))
 p2 = plot_relationship(results["iwildcam"], "test_performance", "test_security", p=plot(title="iWildCam", xlabel="ID Test Performance", ylabel="Test Security"))
@@ -209,6 +260,10 @@ p3 = plot_relationship(results["fmow"], "test_performance", "test_security", p=p
 p4 = plot_relationship(results["rxrx1"], "test_performance", "test_security", p=plot(title="RxRx1", xlabel="ID Test Performance", ylabel="Test Security"))
 plot(p1, p2, p3, p4, layout=(1, 4), size=(4*400, 400), dpi=300, left_margin=10Plots.mm, bottom_margin=10Plots.mm)
 savefig("analysis/figures/security_vs_perf.png")
+
+p1 = plot_relationship(results["iwildcam"], "test_performance", "test_security", p=plot(title="iWildCam", xlabel="ID Test Performance", ylabel="Test Security"))
+p2 = plot_relationship(ft_results["iwildcam"], "test_performance", "test_security", p=plot(title="iWildCam", xlabel="ID Test Performance", ylabel="Test Security"))
+
 
 # Performance and fault detection
 p1 = plot_relationship(results["camelyon17"], "test_performance", "test_ood_detection", p=plot(title="Camelyon17", xlabel="ID Test Performance", ylabel="Test Fault Detection"))
@@ -218,6 +273,9 @@ p4 = plot_relationship(results["rxrx1"], "test_performance", "test_ood_detection
 plot(p1, p2, p3, p4, layout=(1, 4), size=(4*450, 450), dpi=300, left_margin=10Plots.mm, bottom_margin=10Plots.mm)
 savefig("analysis/figures/fault_detection_vs_perf.png")
 
+p1 = plot_relationship(results["iwildcam"], "test_performance", "test_ood_detection", p=plot(title="iWildCam", xlabel="ID Test Performance", ylabel="Test Fault Detection"))
+p2 = plot_relationship(ft_results["iwildcam"], "test_performance", "test_ood_detection", p=plot(title="iWildCam", xlabel="ID Test Performance", ylabel="Test Fault Detection"))
+
 
 # Check val and test hre performance
 p1 = plot_relationship(results["camelyon17"], "val_hre_score", "test_hre_score", p=plot(title="Camelyon17", xlabel="HRE (Val)", ylabel="HRE (Test)"), show_yeqx=true, scale_yeqx=false)
@@ -226,6 +284,10 @@ p3 = plot_relationship(results["fmow"], "val_hre_score", "test_hre_score", p=plo
 p4 = plot_relationship(results["rxrx1"], "val_hre_score", "test_hre_score", p=plot(title="RxRx1", xlabel="HRE (Val)", ylabel="HRE (Test)"), show_yeqx=true, scale_yeqx=false)
 plot(p1, p2, p3, p4, layout=(1, 4), size=(4*400, 400), dpi=300, left_margin=10Plots.mm, bottom_margin=10Plots.mm)
 savefig("analysis/figures/test_hre_vs_val_hre.png")
+
+p1 = plot_relationship(results["iwildcam"], "val_hre_score", "test_hre_score", p=plot(title="iWildCam", xlabel="HRE (Val)", ylabel="HRE (Test)"), show_yeqx=true, scale_yeqx=false)
+p2 = plot_relationship(ft_results["iwildcam"], "val_hre_score", "test_hre_score", p=plot(title="iWildCam", xlabel="HRE (Val)", ylabel="HRE (Test)"), show_yeqx=true, scale_yeqx=false)
+
 
 
 ## Compare individual algorithms across metrics (one plot per dataset)
@@ -270,44 +332,93 @@ end
 scatter_plots("val_performance", "Performance (Val)")
 savefig("analysis/figures/val_performance_plots.png")
 
+metric, metric_name = "val_performance", "Performance (Val)"
+p = scatter_scores(all_results["iwildcam"]; metric, p=plot(ylabel=metric_name, title="iWildCam $metric_name"))
+
 scatter_plots("test_performance", "Performance (Test)")
 savefig("analysis/figures/test_performance_plots.png")
+
+metric, metric_name = "test_performance", "Performance (Test)"
+p = scatter_scores(all_results["iwildcam"]; metric, p=plot(ylabel=metric_name, title="iWildCam $metric_name"))
 
 scatter_plots("val_ds_performance", "DS Performance (Val)")
 savefig("analysis/figures/val_ds_performance_plots.png")
 
+metric, metric_name = "val_ds_performance", "DS Performance (Val)"
+p = scatter_scores(all_results["iwildcam"]; metric, p=plot(ylabel=metric_name, title="iWildCam $metric_name"))
+
 scatter_plots("test_ds_performance", "DS Performance (Test)")
 savefig("analysis/figures/test_ds_performance_plots.png")
+
+metric, metric_name = "test_ds_performance", "DS Performance (Test)"
+p = scatter_scores(all_results["iwildcam"]; metric, p=plot(ylabel=metric_name, title="iWildCam $metric_name"))
 
 scatter_plots("val_robustness", "Robustness (Val)")
 savefig("analysis/figures/val_robustness_plots.png")
 
+metric, metric_name = "val_robustness", "Robustness (Val)"
+p = scatter_scores(all_results["iwildcam"]; metric, p=plot(ylabel=metric_name, title="iWildCam $metric_name"))
+
 scatter_plots("test_robustness", "Robustness (Test)")
 savefig("analysis/figures/test_robustness_plots.png")
+
+metric, metric_name = "test_robustness", "Robustness (Test)"
+p = scatter_scores(all_results["iwildcam"]; metric, p=plot(ylabel=metric_name, title="iWildCam $metric_name"))
+
 
 scatter_plots("val_security", "Security (Val)")
 savefig("analysis/figures/val_security_plots.png")
 
+metric, metric_name = "val_security", "Security (Val)"
+p = scatter_scores(all_results["iwildcam"]; metric, p=plot(ylabel=metric_name, title="iWildCam $metric_name"))
+
 scatter_plots("test_security", "Security (Test)")
 savefig("analysis/figures/test_security_plots.png")
+
+metric, metric_name = "test_security", "Security (Test)"
+p = scatter_scores(all_results["iwildcam"]; metric, p=plot(ylabel=metric_name, title="iWildCam $metric_name"))
+
 
 scatter_plots("val_calibration", "Calibration (Val)")
 savefig("analysis/figures/val_calibration_plots.png")
 
+metric, metric_name = "val_calibration", "Calibration (Val)"
+p = scatter_scores(all_results["iwildcam"]; metric, p=plot(ylabel=metric_name, title="iWildCam $metric_name"))
+
+
 scatter_plots("test_calibration", "Calibration (Test)")
 savefig("analysis/figures/test_calibration_plots.png")
+
+metric, metric_name = "test_calibration", "Calibration (Test)"
+p = scatter_scores(all_results["iwildcam"]; metric, p=plot(ylabel=metric_name, title="iWildCam $metric_name"))
+
 
 scatter_plots("val_ood_detection", "Fault Detection (Val)")
 savefig("analysis/figures/val_fault_detection_plots.png")
 
+metric, metric_name = "val_ood_detection", "Fault Detection (Val)"
+p = scatter_scores(all_results["iwildcam"]; metric, p=plot(ylabel=metric_name, title="iWildCam $metric_name"))
+
 scatter_plots("test_ood_detection", "Fault Detection  (Test)")
 savefig("analysis/figures/test_fault_detection_plots.png")
+
+metric, metric_name = "test_ood_detection", "Fault Detection  (Test)"
+p = scatter_scores(all_results["iwildcam"]; metric, p=plot(ylabel=metric_name, title="iWildCam $metric_name"))
+
 
 scatter_plots("val_hre_score", "HRE Score (Val)")
 savefig("analysis/figures/val_hre_score_plots.png")
 
+metric, metric_name = "val_hre_score", "HRE Score (Val)"
+p = scatter_scores(all_results["iwildcam"]; metric, p=plot(ylabel=metric_name, title="iWildCam $metric_name"))
+
+
 scatter_plots("test_hre_score", "HRE Score (Test)")
 savefig("analysis/figures/test_hre_score_plots.png")
+
+metric, metric_name = "test_hre_score", "HRE Score (Test)"
+p = scatter_scores(all_results["iwildcam"]; metric, p=plot(ylabel=metric_name, title="iWildCam $metric_name"))
+
 
 ## Plot the dataset specific performance of each model
 p1 = scatter_scores(results["camelyon17"]; metric="camelyon17-test_performance", p=plot(ylabel="Performance", title="Cameylon17 (Test)"))
@@ -316,6 +427,19 @@ p3 = scatter_scores(results["fmow"]; metric="fmow-test_performance", p=plot(ylab
 p4 = scatter_scores(results["rxrx1"]; metric="rxrx1-test_performance", p=plot(ylabel="Performance", title="RxRx1 (Test)"))
 plot(p1, p2, p3, p4, layout=grid(1, 4, widths=(0.28, 0.28, 0.28, 0.16)), size=(400*4, 400), bottom_margin=30Plots.mm, left_margin=10Plots.mm, dpi=300)
 savefig("analysis/figures/wilds_test_performance.png")
+
+
+p = scatter_scores(all_results["iwildcam"]; metric="iwildcam-test_performance", p=plot(ylabel="Performance", title="iWildCam (Test)"))
+
+
+
+scatter_scores(all_results["iwildcam"]; metric="iwildcam-test_performance", p=plot(ylabel="Performance", title="iWildCam (Test)"))
+
+scatter_scores(all_results["iwildcam"]; metric="test_hre_score", p=plot(ylabel="Performance", title="iWildCam (Test)"))
+scatter_scores(all_results["iwildcam"]; metric="test_robustness", p=plot(ylabel="Performance", title="iWildCam (Test)"))
+scatter_scores(all_results["iwildcam"]; metric="test_ds_performance", p=plot(ylabel="Performance", title="iWildCam (Test)"))
+scatter_scores(all_results["iwildcam"]; metric="iwildcam-test_performance", p=plot(ylabel="Performance", title="iWildCam (Test)"))
+scatter_scores(all_results["iwildcam"]; metric="iwildcam-id_test-corruption1_test_performance", p=plot(ylabel="Performance", title="iWildCam Corruption1(Test)"))
 
 p1 = scatter_scores(results["camelyon17"]; metric="camelyon17-val_performance", p=plot(ylabel="Performance", title="Cameylon17 (Val)"))
 p2 = scatter_scores(results["iwildcam"]; metric="iwildcam-val_performance", p=plot(ylabel="Performance", title="iWildCam (Val)"))

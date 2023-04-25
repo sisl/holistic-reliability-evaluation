@@ -17,7 +17,7 @@ parameters:
   optimizer:
     values: [adam, sgd, adamw]
   batch_size:
-    values: [32, 64, 128]
+    values: [12, 24, 48]
   lr:
     distribution: log_uniform_values
     min: 1e-4

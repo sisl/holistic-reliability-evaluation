@@ -1,0 +1,4 @@
+
+[submodule "holistic_reliability_evaluation/mae"]
+	path = holistic_reliability_evaluation/mae
+	url = git@github.com:facebookresearch/mae.git

@@ -1,7 +1,7 @@
 # Saving setup
 algorithm: erm
 phase: train
-save_folder: /scratch/users/acorso/results/
+save_folder: /mnt/data/acorso/results/
 
 # Training dataset information
 data_dir: /scratch/users/acorso/data/
@@ -25,6 +25,7 @@ max_epochs: 60
 lr: 0.001
 batch_size: 128
 optimizer: adam
+model_source: torchvision
 model: densenet121
 label_smoothing: 0.0
 pretrained_weights: DEFAULT
