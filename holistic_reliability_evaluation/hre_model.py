@@ -9,6 +9,7 @@ import torchvision
 from torchvision.models import get_model, get_model_weights
 import torchvision.transforms as tfs
 import open_clip
+import torchattacks
 
 import multiprocessing
 import sys, os
@@ -162,6 +163,8 @@ class HREModel(pl.LightningModule):
         ]
         both_transforms = [tfs.Compose([*self.train_transforms, *self.eval_transforms])]
 
+        self.adversarial_training_method = torchattacks.PGD(self)
+
         # Load the train dataset
         print("Loading train dataset...")
         self.train_dataset = load_dataset(
@@ -270,6 +273,8 @@ class HREModel(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, y = batch[0], batch[1]
+        if self.adversarial_training_method != None:
+            x = self.adversarial_training_method(x, y)
         logits = self(x)
         loss = self.loss_fn(logits, y)
         self.log("train_loss", loss)
