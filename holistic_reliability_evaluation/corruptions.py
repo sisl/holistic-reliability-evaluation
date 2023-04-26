@@ -209,7 +209,7 @@ def motion_blur(x, severity=1):
     x = cv2.imdecode(np.frombuffer(x.make_blob(), np.uint8),
                      cv2.IMREAD_UNCHANGED)
     
-    if x.shape != sz:
+    if len(x.shape) == 3:
         return to_image_from_0_255(x[..., [2, 1, 0]])
     else:  # greyscale to RGB
         return to_image_from_0_255(np.array([x, x, x]).transpose((1, 2, 0)))
@@ -281,7 +281,7 @@ def snow(x, severity=1):
 
     snow_layer.motion_blur(radius=c[4], sigma=c[5], angle=np.random.uniform(-135, -45))
 
-    snow_layer = cv2.imdecode(np.fromstring(snow_layer.make_blob(), np.uint8),
+    snow_layer = cv2.imdecode(np.frombuffer(snow_layer.make_blob(), np.uint8),
                               cv2.IMREAD_UNCHANGED) / 255.
     snow_layer = snow_layer[..., np.newaxis]
 
@@ -521,5 +521,31 @@ def plot_corrupted_image(x, severity=1):
     plt.imshow(saturate(x, severity))
     plt.savefig("saturate.png")
 
-    
-    
+
+## This is some code to run all the corruptions on a bunch of wilds datasets which feature gray-scale and multi-size images
+# import wilds
+# import torch
+# import torchvision.transforms as tfs
+# dataset = wilds.get_dataset(dataset="iwildcam", root_dir="/scratch/users/acorso/data")
+
+# transforms_list = []
+# transforms_list.append(tfs.Resize([448,448]))
+# transforms_list.append(tfs.ToTensor())
+# transforms_list.append(tfs.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
+
+# tf = transforms.Compose(transforms_list)
+
+# for i in np.random.permutation(len(dataset)):
+#     print("index: ", i)
+#     x, y, md = dataset[i]
+#     j=0
+#     for c in all_corruptions():
+#         print("corruption: ", j)
+#         j = j+1
+#         xc = c(x)
+#         tensor = tf(xc)
+#         print(tensor.shape)
+#         if tensor.shape[0] == 1:
+#             print("got one at ", i, " with ", c)
+#             exit()
+        

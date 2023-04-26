@@ -31,6 +31,7 @@ label_smoothing: 0.0
 pretrained_weights: DEFAULT
 freeze_weights: True
 unfreeze_k_layers: 2
+calibration_method: none # options are none, temperature_scaling
 
 # HRE setup
 val_id_dataset: fmow-id_val

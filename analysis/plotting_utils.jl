@@ -40,10 +40,15 @@ function load_results(results_dir; self_trained=false, phase="train")
                 continue
             end
             for s in seeds
-                results = CSV.read(joinpath(seed_dir, s, "metrics.csv"), DataFrame)
-                params = YAML.load_file(joinpath(seed_dir, s, "hparams.yaml"))
-                if "test_performance" in names(results)
+                try
+                    results = CSV.read(joinpath(seed_dir, s, "metrics.csv"), DataFrame)
+                    params = YAML.load_file(joinpath(seed_dir, s, "hparams.yaml"))
+                    # if "test_performance" in names(results)
                     evaluation_results[d][a][s] = (results, params)
+                    # end
+                catch e
+                    print("error: ", e)
+                    @warn "Failed to read results for $(d) $(a) $(s)"
                 end
             end
         end
@@ -54,12 +59,25 @@ end
 function get_perf(dataset_results, sym, alg)
     vals = Float64[]
     for ver in keys(dataset_results[alg])
+        if !(sym in names(dataset_results[alg][ver][1]))
+            for n in names(dataset_results[alg][ver][1])
+                println("$sym == $n ? $(sym == n)")
+                println("type of sym: $(typeof(sym)), type of name: $(typeof(n))")
+            end
+            continue
+        end
         v = dataset_results[alg][ver][1][!,sym]
         nonmissing = .! ismissing.(v)
         if sum(nonmissing) > 1
             @warn "Multiple values for $sym"
         end
         val = v[findlast(nonmissing)]
+
+        # TODO: Find a better way to filter outliers
+        if sym=="val_performance" && val < 0.3
+            println("found 1")
+            continue
+        end
 
         # Push back the value
         push!(vals, val)
@@ -68,11 +86,6 @@ function get_perf(dataset_results, sym, alg)
 end
 
 function get_all_by_alg(dataset_results, sym)
-    # Convert to a symbol if needed
-    if sym isa String
-        sym = Symbol(sym)
-    end
-
     algs = []
     vals = []
     for alg in keys(dataset_results)

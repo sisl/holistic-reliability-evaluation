@@ -4,7 +4,8 @@ import numpy as np
 from collections import namedtuple
 
 Ntrials = 20
-config = load_config("configs/fmow-finetune.yml")
+dataset = "rxrx1"
+config = load_config(f"configs/{dataset}-finetune.yml")
 config["finetune_experimets"] = True
 
 label_smoothing_sampler = lambda: np.random.choice([0.1, 0.01, 0.0]).item()
@@ -39,7 +40,7 @@ setups = [
     Setup("mae", "vit_l_16", "DEFAULT"),
     Setup("mae", "vit_h_14", "DEFAULT"),
 ]
-file_name = "record.txt"
+file_name = f"{dataset}_record.txt"
 
 # Loop over hyperparameters
 for trial in range(Ntrials):

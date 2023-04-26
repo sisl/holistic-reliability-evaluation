@@ -140,7 +140,7 @@ class HREModel(pl.LightningModule):
         super().__init__()
 
         # Save the hyperparameters
-        self.save_hyperparameters()
+        # self.save_hyperparameters()
 
         # Store config
         self.config = config
@@ -251,6 +251,14 @@ class HREModel(pl.LightningModule):
         self.batch_size = config["batch_size"]
         self.optimizer = optimizer_options[config["optimizer"]]
         self.lr = config["lr"]
+        
+        # Setup temperature for temp scaling
+        self.T = 1
+        if config["calibration_method"] == "none":
+            self.temperature_scale=False
+        elif config["calibration_method"] == "temperature_scaling":
+            print("Using temperature scaling")
+            self.temperature_scale=True
 
     ## Pytorch Lightning functions
     def configure_optimizers(self):
@@ -269,6 +277,10 @@ class HREModel(pl.LightningModule):
         return loss
 
     def validation_step(self, val_batch, batch_idx):
+        if batch_idx==0 and self.temperature_scale:
+            print("Updating T...")
+            self.update_T()
+            
         return self.compute_all_needed_outputs(val_batch, batch_idx)
 
     def validation_epoch_end(self, validation_step_outputs):
@@ -321,7 +333,7 @@ class HREModel(pl.LightningModule):
     ## The following functions define the various reliability metrics and should either be implmented by a sublcass, or use members that should be supplied by a subclass
     def predictions(self, batch):
         x, y = batch[0], batch[1]
-        pred = self.model(x)
+        pred = self.forward(x)
         return {"pred": pred, "y": y}
 
     def adversarial_predictions(self, batch):
@@ -390,6 +402,40 @@ class HREModel(pl.LightningModule):
             id_name + "_adv_performance": adv_performance,
             prefix + "_security": security,
         }
+        
+    # From: https://towardsdatascience.com/neural-network-calibration-using-pytorch-c44b7221a61
+    def update_T(self):
+        print("Temperature scaling...")
+        validation_data = self.val_dataloader()
+        temperature = nn.Parameter(torch.ones(1).cuda())
+        criterion = nn.CrossEntropyLoss()
+        optimizer = torch.optim.LBFGS([temperature], lr=0.001, max_iter=10000, line_search_fn='strong_wolfe')
+        device = self.device
+
+        logits_list = []
+        labels_list = []
+
+        for hrebatch in validation_data:
+            batch = hrebatch["id"]
+            x, y = batch[0].to(device), batch[1].to(device)
+
+            self.model.eval()
+            with torch.no_grad():
+                logits_list.append(self.model(x))
+                labels_list.append(y)
+
+        # Create tensors
+        logits_list = torch.cat(logits_list).to(device)
+        labels_list = torch.cat(labels_list).to(device)
+
+        def _eval():
+            loss = criterion(logits_list/temperature, labels_list)
+            loss.backward()
+            return loss
+
+        optimizer.step(_eval)
+        self.T = temperature.item()
+        print("self.T: ", self.T)
 
     def calibration_info(self, id_cal, ds_cals, prefix, id_name, ds_names):
         results = {prefix + "_calibration": 0.0}
@@ -469,14 +515,15 @@ class ClassificationTask(HREModel):
     def __init__(self, config, model=None, *args, **kwargs):
         # Call the HRE constuctor
         super().__init__(config, *args, **kwargs)
+        
+        # Save the hyperparams
+        self.save_hyperparameters(ignore=["model"])
 
         # Load the model, possibly with pre-trained weights
         self.model = construct_model(config) if model is None else model
 
         # Freeze parameters for finetuning
         if config["freeze_weights"] and config["unfreeze_k_layers"] != "all":
-            print(config["unfreeze_k_layers"])
-            print(config["freeze_weights"] and config["unfreeze_k_layers"] != "all")
             freeze_weights(self.model, config["unfreeze_k_layers"])
 
         # Set the defaults for a classification task
@@ -497,7 +544,7 @@ class ClassificationTask(HREModel):
         self.loss_fn = nn.CrossEntropyLoss(label_smoothing=config["label_smoothing"])
 
     def forward(self, x):
-        return self.model(x)
+        return self.model(x)/self.T # self.T defaults to 1
 
     # By default, we use a gradient based attack
     def adversarial_predictions(self, batch):
