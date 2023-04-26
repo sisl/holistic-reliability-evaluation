@@ -32,6 +32,8 @@ pretrained_weights: DEFAULT
 freeze_weights: True
 unfreeze_k_layers: 2
 calibration_method: none # options are none, temperature_scaling
+unfreeze_k_layers: 1
+adversarial_training_method:
 
 # HRE setup
 val_id_dataset: iwildcam-id_val

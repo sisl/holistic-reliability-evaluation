@@ -32,6 +32,7 @@ pretrained_weights: DEFAULT
 freeze_weights: False
 unfreeze_k_layers: 0
 calibration_method: none # options are none, temperature_scaling
+adversarial_training_method:
 
 # HRE setup
 val_id_dataset: camelyon17-id_val
