@@ -163,8 +163,6 @@ class HREModel(pl.LightningModule):
         ]
         both_transforms = [tfs.Compose([*self.train_transforms, *self.eval_transforms])]
 
-        # self.adversarial_training_method = torchattacks.PGD(self)
-
         # Load the train dataset
         print("Loading train dataset...")
         self.train_dataset = load_dataset(
@@ -284,7 +282,8 @@ class HREModel(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch[0], batch[1]
         if self.adversarial_training_method != None:
-            x = self.adversarial_training_method(x, y)
+            dev = x.device
+            x = self.adversarial_training_method(x, y).to(dev)
         logits = self(x)
         loss = self.loss_fn(logits, y)
         self.log("train_loss", loss)
@@ -541,6 +540,12 @@ class ClassificationTask(HREModel):
         if config["freeze_weights"] and config["unfreeze_k_layers"] != "all":
             freeze_weights(self.model, config["unfreeze_k_layers"])
 
+
+        atk = torchattacks.AutoAttack(self.model, eps=3/255)
+        atk.set_normalization_used(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        atk.set_device(torch.device('cuda'))
+        self.adversarial_training_method = atk
+
         # Set the defaults for a classification task
         # By default we set the performance metric to accuracy
         self.performance_metric = Accuracy(
@@ -566,7 +571,7 @@ class ClassificationTask(HREModel):
         if self.num_adv == 0:
             return -1.0
 
-        adversary = AutoAttack(self.model, device=self.device)
+        adversary = AutoAttack(self.model, device=self.device, eps=3/255)
 
         # Set the target classes to not exceed the number of remaining classes
         adversary.fab.n_target_classes = min(9, self.n_classes - 1)
