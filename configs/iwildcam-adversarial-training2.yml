@@ -30,6 +30,10 @@ label_smoothing: 0.0
 pretrained_weights: DEFAULT
 freeze_weights: False
 unfreeze_k_layers: 0
+# leave empty for no adversarial training. Typically "PGD".
+adversarial_training_method: PGD
+# the next line is `eval`d, so you can write fractions, etc etc
+adversarial_training_eps: 3/255
 
 # HRE setup
 val_id_dataset: iwildcam-id_val

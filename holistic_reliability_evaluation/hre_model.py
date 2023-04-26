@@ -530,10 +530,21 @@ class ClassificationTask(HREModel):
             freeze_weights(self.model, config["unfreeze_k_layers"])
 
 
-        atk = torchattacks.PGD(self.model, eps=3/255)
-        atk.set_normalization_used(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        atk.set_device(torch.device('cuda'))
-        self.adversarial_training_method = atk
+        if config["adversarial_training_method"] != None:
+            atk_type = getattr(torchattacks, config["adversarial_training_method"])
+            try:  # if expression or string
+                eps = eval(config["adversarial_training_eps"])
+            except TypeError:  # if straight up number
+                eps = config["adversarial_training_eps"]
+            atk = atk_type(self.model, eps=eps)
+            # find normalization values in `utils.py:get_predefined_transforms`
+            atk.set_normalization_used(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            atk.set_device(torch.device('cuda'))
+            self.adversarial_training_method = atk
+        else:
+            self.adversarial_training_method = None
+
+
 
         # Set the defaults for a classification task
         # By default we set the performance metric to accuracy
