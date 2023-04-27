@@ -9,6 +9,7 @@ import torchvision
 from torchvision.models import get_model, get_model_weights
 import torchvision.transforms as tfs
 import open_clip
+import torchattacks
 
 import multiprocessing
 import sys, os
@@ -262,14 +263,16 @@ class HREModel(pl.LightningModule):
 
     ## Pytorch Lightning functions
     def configure_optimizers(self):
-        # TODO: Learning rate scheduler?
-
         return self.optimizer(
             filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr
         )
 
+
     def training_step(self, batch, batch_idx):
         x, y = batch[0], batch[1]
+        if self.adversarial_training_method != None:
+            dev = x.device
+            x = self.adversarial_training_method(x, y).to(dev)
         logits = self(x)
         loss = self.loss_fn(logits, y)
         self.log("train_loss", loss)
@@ -526,6 +529,23 @@ class ClassificationTask(HREModel):
         if config["freeze_weights"] and config["unfreeze_k_layers"] != "all":
             freeze_weights(self.model, config["unfreeze_k_layers"])
 
+
+        if config["adversarial_training_method"] != None:
+            atk_type = getattr(torchattacks, config["adversarial_training_method"])
+            try:  # if expression or string
+                eps = eval(config["adversarial_training_eps"])
+            except TypeError:  # if straight up number
+                eps = config["adversarial_training_eps"]
+            atk = atk_type(self.model, eps=eps)
+            # find normalization values in `utils.py:get_predefined_transforms`
+            atk.set_normalization_used(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            atk.set_device(torch.device('cuda'))
+            self.adversarial_training_method = atk
+        else:
+            self.adversarial_training_method = None
+
+
+
         # Set the defaults for a classification task
         # By default we set the performance metric to accuracy
         self.performance_metric = Accuracy(
@@ -551,7 +571,7 @@ class ClassificationTask(HREModel):
         if self.num_adv == 0:
             return -1.0
 
-        adversary = AutoAttack(self.model, device=self.device)
+        adversary = AutoAttack(self.model, device=self.device, eps=3/255)
 
         # Set the target classes to not exceed the number of remaining classes
         adversary.fab.n_target_classes = min(9, self.n_classes - 1)

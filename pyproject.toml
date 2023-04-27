@@ -28,6 +28,7 @@ autoattack = {git = "https://github.com/fra31/auto-attack.git"}
 opencv-python = "^4.7.0.72"
 torchattacks = "^3.4.0"
 pandas = "<2.0"
+open-clip-torch = "^2.18.0"
 
 
 [build-system]
