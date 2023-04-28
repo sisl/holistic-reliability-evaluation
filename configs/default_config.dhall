@@ -1,42 +1,153 @@
 let Types = ./types.dhall
 
-let HREConfig =
+let user
+    : Text
+    = env:USER as Text
+
+let pathMod
+    : Text
+    = "holistic-reliability-evaluation"
+
+let scratchPath
+    : Text
+    = "/scratch/users/${user}/${pathMod}"
+
+let SavingConfig =
+      { Type = { algorithm : Text, phase : Types.Phase, save_folder : Text }
+      , default =
+        { algorithm = "ERM"
+        , phase = Types.Phase.train
+        , save_folder = "\$scratchPath/results/"
+        }
+      }
+
+let TrainingDatasetConfig =
       { Type =
-          { algorithm : Text
-          , phase : Types.Phase
-          , save_folder : Text
-          , data_dir : Text
+          { data_dir : Text
           , n_classes : Natural
           , train_dataset : Types.Dataset
           , size : List Natural
-          , train_transforms : List Types.Transform
           , n_channels : Natural
+          , train_transforms : List Types.Transform
+          , eval_transforms : List Types.Transform
           , min_performance : Double
           , max_performance : Double
-          , max_num_workers : Natural
-          , accelerator : Types.Accellerator
+          }
+      , default =
+        { data_dir = "\$scratchPath/data/"
+        , n_classes = 182
+        , train_dataset = Types.Dataset.iwildcam-train
+        , size = [ 224, 224 ]
+        , n_channels = 3
+        , train_transforms = [] : List Types.Transform
+        , eval_transforms = [ Types.Transform.wilds_default_normalization]
+        , min_performance = 0.0
+        , max_performance = 1.0
+        }
+      }
+
+let ResourceConfig =
+      { Type =
+          { max_num_workers : Natural
+          , accelerator : Types.Accelerator
           , devices : Natural
           }
       , default =
-          let user
-              : Text
-              = env:USER as Text
-          let pathMod : Text = "holistic-reliability-evaluation"
-
-          in  { algorithm = "ERM"
-              , phase = Types.Phase.train
-              , save_folder = "/scratch/users/${user}/${pathMod}/results/"
-              , data_dir = "/scratch/users/${user}/${pathMod}/data/"
-              , n_classes = 3
-              , n_channels = 3
-              , train_dataset = Types.Dataset.iwildcam-train
-              , size = [ 224, 224 ]
-              , min_performance = 0.0
-              , max_performance = 1.0
-              , max_num_workers = 8
-              , accelerator = Types.Accellerator.gpu
-              , train_transforms = [ Types.Transform.default ]
-              , devices = 1
-              }
+        { max_num_workers = 32
+        , accelerator = Types.Accelerator.gpu
+        , devices = 1
+        }
       }
-in HREConfig
+
+let TrainingParamConfig =
+      { Type =
+          { max_epochs : Natural
+          , lr : Double
+          , batch_size : Natural
+          , optimizer : Types.Optim
+          , model_source : Types.ModelLibs
+          , model : Types.Models
+          , label_smoothing : Double
+          , pretrained_weights : Types.PretrainedWeights
+          , freeze_weights : Bool
+          , unfreeze_k_layers : Natural
+          , calibration_method : Optional Types.CalibrationMethods
+          , adversarial_training_method :
+              Optional Types.AdversarialAttackMethods
+          , adversarial_training_eps : Optional < Double | Text >
+          }
+      , defaults =
+        { max_epochs = 12
+        , lr = 0.001
+        , batch_size = 24
+        , optimizer = Types.Optim.adam
+        , model_source = Types.ModelLibs.torchvision
+        , model = Types.Models.resnet50
+        , label_smoothing = 0.0
+        , pretrained_weights = Types.Pretrained_Weights.DEFAULT
+        , freeze_weights = False
+        , unfreeze_k_layers = 0
+        , calibration_method = None Types.Calibration_Method
+        , adversarial_training_method = None Double
+        }
+      }
+
+let HRESetup =
+      { Type =
+          { val_id_dataset : List Types.Dataset
+          , val_ds_datasets : List Types.Dataset
+          , val_ood_datasets : List Types.Dataset
+          , test_id_dataset : List Types.Dataset
+          , test_ds_datasets : List Types.Dataset
+          , test_ood_datasets : List Types.Dataset
+          , val_dataset_length : Natural
+          , test_dataset_length : Natural
+          , num_adv : Natural
+          , w_perf : Double
+          , w_rob : Double
+          , w_sec : Double
+          , w_cal : Double
+          , w_oodd : Double
+          }
+      , defaults =
+        { val_id_dataset = [ Types.Dataset.iwildcam-id_val ]
+        , val_ds_datasets =
+          [ Types.Dataset.iwildcam-val
+          , Types.Dataset.iwildcam-id_val-corruption1_val
+          ]
+        , val_ood_datasets =
+          [ Types.Dataset.gaussian_noise
+          , Types.Dataset.fmow-id_val
+          , Types.Dataset.rxrx1-id_val
+          , Types.Dataset.camelyon17-id_val
+          ]
+        , test_id_dataset = [ Types.Dataset.iwildcam-id_test ]
+        , test_ds_datasets =
+          [ Types.Dataset.iwildcam-test
+          , Types.Dataset.iwildcam-id_test-corruption1_test
+          ]
+        , test_ood_datasets =
+          [ Types.Dataset.gaussian_noise
+          , Types.Dataset.fmow-id_test
+          , Types.Dataset.rxrx1-id_test
+          , Types.Dataset.camelyon17-id_test
+          ]
+        , val_dataset_length = 1024
+        , test_dataset_length = 1024
+        , num_adv = 128
+        , w_perf = 0.2
+        , w_rob = 0.2
+        , w_sec = 0.2
+        , w_cal = 0.2
+        , w_oodd = 0.2
+        }
+      }
+
+let HREConfig =
+          SavingCOnfig::{=}
+      /\  TrainingDatasetConfig::{=}
+      /\  ResourceConfig::{=}
+      /\  TrainingParamConfig::{=}
+      /\  HRESetup::{=}
+
+in  HREConfig
