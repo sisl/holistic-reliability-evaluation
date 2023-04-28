@@ -12,14 +12,17 @@ let scratchPath
     : Text
     = "/scratch/users/${user}/${pathMod}"
 
+let SavingConfigType =
+      { Type = { algorithm : Text, phase : Types.Phase, save_folder : Text } }
+
 let SavingConfig =
-      { Type = { algorithm : Text, phase : Types.Phase, save_folder : Text }
-      , default =
-        { algorithm = "ERM"
-        , phase = Types.Phase.train
-        , save_folder = "\$scratchPath/results/"
-        }
-      }
+          { default =
+            { algorithm = "ERM"
+            , phase = Types.Phase.train
+            , save_folder = "\$scratchPath/results/"
+            }
+          }
+      /\  SavingConfigType
 
 let TrainingDatasetConfig =
       { Type =
@@ -40,7 +43,7 @@ let TrainingDatasetConfig =
         , size = [ 224, 224 ]
         , n_channels = 3
         , train_transforms = [] : List Types.Transform
-        , eval_transforms = [ Types.Transform.wilds_default_normalization]
+        , eval_transforms = [ Types.Transform.wilds_default_normalization ]
         , min_performance = 0.0
         , max_performance = 1.0
         }
@@ -71,12 +74,12 @@ let TrainingParamConfig =
           , pretrained_weights : Types.PretrainedWeights
           , freeze_weights : Bool
           , unfreeze_k_layers : Natural
-          , calibration_method : Optional Types.CalibrationMethods
+          , calibration_method : Optional Types.CalibrationMethod
           , adversarial_training_method :
               Optional Types.AdversarialAttackMethods
           , adversarial_training_eps : Optional < Double | Text >
           }
-      , defaults =
+      , default =
         { max_epochs = 12
         , lr = 0.001
         , batch_size = 24
@@ -84,11 +87,12 @@ let TrainingParamConfig =
         , model_source = Types.ModelLibs.torchvision
         , model = Types.Models.resnet50
         , label_smoothing = 0.0
-        , pretrained_weights = Types.Pretrained_Weights.DEFAULT
+        , pretrained_weights = Types.PretrainedWeights.DEFAULT
         , freeze_weights = False
         , unfreeze_k_layers = 0
-        , calibration_method = None Types.Calibration_Method
-        , adversarial_training_method = None Double
+        , calibration_method = None Types.CalibrationMethod
+        , adversarial_training_method = None Types.AdversarialAttackMethods
+        , adversarial_training_eps = None < Double | Text >
         }
       }
 
@@ -109,7 +113,7 @@ let HRESetup =
           , w_cal : Double
           , w_oodd : Double
           }
-      , defaults =
+      , default =
         { val_id_dataset = [ Types.Dataset.iwildcam-id_val ]
         , val_ds_datasets =
           [ Types.Dataset.iwildcam-val
@@ -144,7 +148,7 @@ let HRESetup =
       }
 
 let HREConfig =
-          SavingCOnfig::{=}
+          SavingConfig::{=}
       /\  TrainingDatasetConfig::{=}
       /\  ResourceConfig::{=}
       /\  TrainingParamConfig::{=}

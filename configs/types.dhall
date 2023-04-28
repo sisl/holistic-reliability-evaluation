@@ -7,6 +7,9 @@
     | gaussian_noise
     | fmow-id_val
     | rxrx1-id_val
+    | fmow-id_test
+    | rxrx1-id_test
+    | camelyon17-id_test
     | camelyon17-id_val
     | iwildcam-id_test
     | iwildcam-test
@@ -19,4 +22,5 @@
 , Models = < resnet50 >
 , PretrainedWeights = < DEFAULT >
 , AdversarialAttackMethods = < PGD | FGSM | AutoAttack >
+, CalibrationMethod = < temp_scaling >
 }
