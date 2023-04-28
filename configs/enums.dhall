@@ -21,6 +21,6 @@
 , ModelLibs = < torchvision | open_clip >
 , Models = < resnet50 >
 , PretrainedWeights = < DEFAULT >
-, AdversarialAttackMethods = < PGD | FGSM | AutoAttack >
+, AdversarialAttack = < PGD | FGSM | AutoAttack >
 , CalibrationMethod = < temp_scaling >
 }
