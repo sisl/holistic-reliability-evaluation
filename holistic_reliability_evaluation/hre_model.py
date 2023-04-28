@@ -255,9 +255,9 @@ class HREModel(pl.LightningModule):
         
         # Setup temperature for temp scaling
         self.T = 1
-        if config["calibration_method"] == "none":
+        if config.get("calibration_method") == None:
             self.temperature_scale=False
-        elif config["calibration_method"] == "temperature_scaling":
+        elif config.get("calibration_method") == "temperature_scaling":
             print("Using temperature scaling")
             self.temperature_scale=True
 
@@ -530,7 +530,7 @@ class ClassificationTask(HREModel):
             freeze_weights(self.model, config["unfreeze_k_layers"])
 
 
-        if config["adversarial_training_method"] != None:
+        if config.get("adversarial_training_method") != None:
             atk_type = getattr(torchattacks, config["adversarial_training_method"])
             try:  # if expression or string
                 eps = eval(config["adversarial_training_eps"])
