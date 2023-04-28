@@ -22,5 +22,5 @@
 , Models = < resnet50 >
 , PretrainedWeights = < DEFAULT >
 , AdversarialAttack = < PGD | FGSM | AutoAttack >
-, CalibrationMethod = < temp_scaling >
+, CalibrationMethod = < temperature_scaling >
 }

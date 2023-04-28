@@ -54,7 +54,7 @@ let TrainingParamConfig =
 let HRESetup =
           ConfigTypes.HRESetup_t
       /\  { default =
-            { val_id_dataset = [ Enums.Dataset.iwildcam-id_val ]
+            { val_id_dataset = Enums.Dataset.iwildcam-id_val
             , val_ds_datasets =
               [ Enums.Dataset.iwildcam-val, Enums.Dataset.iwildcam-id_val-corruption1_val ]
             , val_ood_datasets =
@@ -63,7 +63,7 @@ let HRESetup =
               , Enums.Dataset.rxrx1-id_val
               , Enums.Dataset.camelyon17-id_val
               ]
-            , test_id_dataset = [ Enums.Dataset.iwildcam-id_test ]
+            , test_id_dataset = Enums.Dataset.iwildcam-id_test
             , test_ds_datasets =
               [ Enums.Dataset.iwildcam-test
               , Enums.Dataset.iwildcam-id_test-corruption1_test

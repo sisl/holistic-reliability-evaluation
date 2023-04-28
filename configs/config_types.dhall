@@ -67,10 +67,10 @@ let TrainingParamConfig_t =
 
 let HRESetup_t =
       { Type =
-          { val_id_dataset : List Dataset
+          { val_id_dataset : Dataset
           , val_ds_datasets : List Dataset
           , val_ood_datasets : List Dataset
-          , test_id_dataset : List Dataset
+          , test_id_dataset : Dataset
           , test_ds_datasets : List Dataset
           , test_ood_datasets : List Dataset
           , val_dataset_length : Natural
