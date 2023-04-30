@@ -14,16 +14,14 @@ def evaluate_all_seeds(
     filename_fn = model_desc["filename_fn"]
     load_fn = model_desc["load_fn"]
     args = model_desc["args"]
+    
+    config["val_dataset_length"] = eval_size
+    config["test_dataset_length"] = eval_size
 
     # Check the inference mode, if True, disable adversarial evaluation
     if inference_mode:
         config["num_adv"] = 0
         config["w_sec"] = 0.0
-
-    # Set the evaluation size
-    config["val_dataset_length"] = eval_size
-    config["val_batch_size"] = eval_size
-    config["test_dataset_length"] = eval_size
 
     # Set the algorithm name and an indicator that this was one of the wilds pretrained models
     config["algorithm"] = model_desc["name"]

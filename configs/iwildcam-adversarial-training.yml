@@ -1,0 +1,60 @@
+# Saving setup
+algorithm: finetune
+phase: train
+save_folder: /scratch/users/romeov/holistic-reliability-evaluation/results/
+
+# Training dataset information
+data_dir: /scratch/users/romeov/holistic-reliability-evaluation/data/
+n_classes: 182
+train_dataset: iwildcam-train
+size: [224, 224]
+n_channels: 3
+train_transforms: []
+eval_transforms: [pretrain_default]
+# These are for scaling the performance:
+min_performance: 0.
+max_performance: 1.0
+
+# Parameters controlling resources
+max_num_workers: 32
+accelerator: gpu
+devices: 1
+
+# Training params - (Many of these are likely going to be tuned)
+max_epochs: 10
+lr: 0.001
+batch_size: 1024
+optimizer: adamw
+model: VIT_L_16
+label_smoothing: 0.0
+pretrained_weights: IMAGENET1K_SWAG_LINEAR_V1
+freeze_weights: True
+unfreeze_k_layers: 1
+
+# HRE setup
+val_id_dataset: iwildcam-id_val
+val_ds_datasets:
+  - iwildcam-val
+  - iwildcam-id_val-corruption1_val
+val_ood_datasets:
+  - gaussian_noise
+  - fmow-id_val
+  - rxrx1-id_val
+  - camelyon17-id_val
+test_id_dataset: iwildcam-id_test
+test_ds_datasets:
+  - iwildcam-test
+  - iwildcam-id_test-corruption1_test
+test_ood_datasets:
+  - gaussian_noise
+  - fmow-id_test
+  - rxrx1-id_test
+  - camelyon17-id_test
+val_dataset_length: 1024
+test_dataset_length: 1024
+num_adv: 128
+w_perf: 0.2
+w_rob: 0.2
+w_sec: 0.2
+w_cal: 0.2
+w_oodd: 0.2

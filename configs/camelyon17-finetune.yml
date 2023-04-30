@@ -1,7 +1,7 @@
 # Saving setup
 algorithm: finetune
 phase: train
-save_folder: /scratch/users/acorso/results/
+save_folder: /mnt/data/acorso/results/
 
 # Training dataset information
 data_dir: /scratch/users/acorso/data/
@@ -21,15 +21,17 @@ accelerator: gpu
 devices: 1
 
 # Training params - (Many of these are likely going to be tuned)
-max_epochs: 15
+max_epochs: 5
 lr: 0.001
-batch_size: 1024
+batch_size: 24
 optimizer: adamw
-model: VIT_L_16
+model_source: mae # options include "torchvision", "open_clip", "mae"
+model: vit_l_16 
 label_smoothing: 0.00
-pretrained_weights: IMAGENET1K_SWAG_LINEAR_V1
+pretrained_weights: DEFAULT
 freeze_weights: True
 unfreeze_k_layers: 1
+calibration_method: none # options are none, temperature_scaling
 
 # HRE setup
 val_id_dataset: camelyon17-id_val
