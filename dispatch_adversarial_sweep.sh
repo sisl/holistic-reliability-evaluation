@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 DEFAULT_CONFIGS=('iwildcam-defaults.yml' 'fmow-defaults.yml' 'camelyon17-defaults.yml' 'rxrx1-defaults.yml')
-TMPD=$(mktemp -d)
+TMPD="tmp"
 
 for iter in {1..1}; do
     for DEFAULT_CONFIG in "${DEFAULT_CONFIGS[@]}"; do
