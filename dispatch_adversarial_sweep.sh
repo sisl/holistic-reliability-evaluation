@@ -5,7 +5,9 @@ TMPD="tmp"
 
 for iter in {1..1}; do
     for DEFAULT_CONFIG in "${DEFAULT_CONFIGS[@]}"; do
-        ./configs/bin/yq eval '.adversarial_training_method = "PGD",
+        ./configs/bin/yq eval '.save_folder = "/scratch/users/romeov/holistic-reliability-evaluation/results",
+                               .data_dir = "/scratch/users/romeov/holistic-reliability-evaluation/data",
+                               .adversarial_training_method = "PGD",
                                .adversarial_training_eps = "3/255",
                                .algorithm = "adversarial_sweep",
                                .max_num_workers = 16' configs/$DEFAULT_CONFIG > $TMPD/$DEFAULT_CONFIG
