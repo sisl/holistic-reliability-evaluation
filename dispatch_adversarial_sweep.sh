@@ -8,7 +8,7 @@ for iter in {1..1}; do
         ./configs/bin/yq eval '.save_folder = "/scratch/users/romeov/holistic-reliability-evaluation/results" |
                                .data_dir = "/scratch/users/romeov/holistic-reliability-evaluation/data" |
                                .max_num_workers = 16 |
-                               .batch_size = .batch_size // 2 |
+                               .batch_size = .batch_size / 2 | .batch_size tag="!!int" |
                                .adversarial_training_method = "PGD" |
                                .adversarial_training_eps = "3/255" |
                                .algorithm = "adversarial_sweep"'\
