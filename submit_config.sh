@@ -10,4 +10,8 @@
 #SBATCH --gpus=1
 
 source .sherlock_env
-poetry run python holistic_reliability_evaluation/train.py --config $1
+if [ "$#" -eq 1 ]; then
+    poetry run python holistic_reliability_evaluation/train.py --config $1
+elif [ "$#" -eq 2 ]; then
+    poetry run python holistic_reliability_evaluation/train.py --config $1 --seed $2
+fi
