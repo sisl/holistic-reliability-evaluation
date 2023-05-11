@@ -2,10 +2,10 @@
 #
 #SBATCH --job-name=iwilds_training_default
 #
-#SBATCH --time=24:00:00
+#SBATCH --time=1:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --mem-per-cpu=2G
+#SBATCH --mem-per-cpu=4G
 #SBATCH -p gpu
 #SBATCH --gpus=1
 
