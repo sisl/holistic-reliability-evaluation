@@ -11,6 +11,7 @@ for iter in {1..1}; do
                                .batch_size = .batch_size / 2 | .batch_size tag="!!int" |
                                .adversarial_training_method = "PGD" |
                                .adversarial_training_eps = "3/255" |
+                               .eval_transforms = ["wilds_default_normalization"] |
                                .algorithm = "adversarial_sweep"'\
                                 configs/$DEFAULT_CONFIG > $TMPD/$DEFAULT_CONFIG
         sbatch submit_config.sh $TMPD/$DEFAULT_CONFIG
