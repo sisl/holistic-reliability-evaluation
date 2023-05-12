@@ -14,6 +14,9 @@ for iter in {1..1}; do
                                .eval_transforms = ["wilds_default_normalization"] |
                                .algorithm = "adversarial_sweep"'\
                                 configs/$DEFAULT_CONFIG > $TMPD/$DEFAULT_CONFIG
+        if [[ "$DEFAULT_CONFIG" = "camelyon17-defaults.yml" ]]; then  # for camelyon we have to half one more time.
+            ./configs/bin/yq eval '.batch_size = .batch_size / 2 | .batch_size tag="!!int"' $TMPD/$DEFAULT_CONFIG $TMPD/$DEFAULT_CONFIG
+        done
         sbatch submit_config.sh $TMPD/$DEFAULT_CONFIG
 
         ./configs/bin/yq e '.adversarial_training_eps = "1/255"' $TMPD/$DEFAULT_CONFIG > $TMPD/${DEFAULT_CONFIG%.*}_1.$iter.yml
@@ -24,7 +27,9 @@ for iter in {1..1}; do
 
         ./configs/bin/yq e '.adversarial_training_method = "FGSM"' $TMPD/$DEFAULT_CONFIG > $TMPD/${DEFAULT_CONFIG%.*}_3.$iter.yml
         sbatch submit_config.sh $TMPD/${DEFAULT_CONFIG%.*}_3.$iter.yml $iter
-        ./configs/bin/yq e '.adversarial_training_method = "AutoAttack"' $TMPD/$DEFAULT_CONFIG > $TMPD/${DEFAULT_CONFIG%.*}_4.$iter.yml
+        ./configs/bin/yq e '.adversarial_training_method = "AutoAttack" |
+                            .batch_size = .batch_size / 2 | .batch_size tag="!!int"'\
+                             $TMPD/$DEFAULT_CONFIG > $TMPD/${DEFAULT_CONFIG%.*}_4.$iter.yml
         sbatch submit_config.sh $TMPD/${DEFAULT_CONFIG%.*}_4.$iter.yml $iter
     done
 done
