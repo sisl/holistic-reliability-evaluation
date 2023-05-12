@@ -16,7 +16,7 @@ for iter in {1..1}; do
                                 configs/$DEFAULT_CONFIG > $TMPD/$DEFAULT_CONFIG
         if [[ "$DEFAULT_CONFIG" = "camelyon17-defaults.yml" ]]; then  # for camelyon we have to half one more time.
             ./configs/bin/yq eval '.batch_size = .batch_size / 2 | .batch_size tag="!!int"' $TMPD/$DEFAULT_CONFIG $TMPD/$DEFAULT_CONFIG
-        done
+        fi
         sbatch submit_config.sh $TMPD/$DEFAULT_CONFIG
 
         ./configs/bin/yq e '.adversarial_training_eps = "1/255"' $TMPD/$DEFAULT_CONFIG > $TMPD/${DEFAULT_CONFIG%.*}_1.$iter.yml
