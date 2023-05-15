@@ -1,0 +1,59 @@
+config:
+  accelerator: gpu
+  algorithm: torchvision_vit_h_14_IMAGENET1K_SWAG_LINEAR_V1
+  batch_size: 12
+  calibration_method: none
+  data_dir: /scratch/users/acorso/data/
+  devices: 1
+  eval_transforms:
+  - pretrain_default
+  finetune_experimets: true
+  freeze_weights: true
+  inference_mode: false
+  label_smoothing: 0.1
+  lr: 0.0016051911333587632
+  max_epochs: 5
+  max_num_workers: 32
+  max_performance: 1.0
+  min_performance: 0.0
+  model: vit_h_14
+  model_source: torchvision
+  n_channels: 3
+  n_classes: 1139
+  num_adv: 128
+  optimizer: sgd
+  phase: train
+  pretrained_weights: IMAGENET1K_SWAG_LINEAR_V1
+  save_folder: /mnt/data/acorso/results/
+  seed: 0
+  size:
+  - 224
+  - 224
+  test_dataset_length: 1024
+  test_ds_datasets:
+  - rxrx1-test
+  - rxrx1-id_test-corruption1_test
+  test_id_dataset: rxrx1-id_test
+  test_ood_datasets:
+  - gaussian_noise
+  - iwildcam-id_test
+  - fmow-id_test
+  - camelyon17-id_test
+  train_dataset: rxrx1-train
+  train_transforms: []
+  unfreeze_k_layers: 8
+  val_dataset_length: 1024
+  val_ds_datasets:
+  - rxrx1-val
+  - rxrx1-id_val-corruption1_val
+  val_id_dataset: rxrx1-id_val
+  val_ood_datasets:
+  - gaussian_noise
+  - iwildcam-id_val
+  - fmow-id_val
+  - camelyon17-id_val
+  w_cal: 0.2
+  w_oodd: 0.2
+  w_perf: 0.2
+  w_rob: 0.2
+  w_sec: 0.2

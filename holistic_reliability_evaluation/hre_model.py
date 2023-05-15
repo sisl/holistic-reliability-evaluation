@@ -47,7 +47,7 @@ def construct_model(config):
     n_classes = config["n_classes"]
     model = config["model"]
     weights = config["pretrained_weights"]
-    if config["model_source"] == "torchvision":
+    if "model_source" not in config or config["model_source"] == "torchvision":
         if weights is None:
             model = get_model(model, num_classes=n_classes)
         else:
@@ -184,7 +184,7 @@ class HREModel(pl.LightningModule):
         val_length = config["val_dataset_length"]
         val_args = {**args, "length": val_length}
         print("Loading id-val dataset...")
-        val = load_dataset(
+        self.val_id = load_dataset(
             data_dir,
             config["val_id_dataset"],
             **val_args,
@@ -199,7 +199,7 @@ class HREModel(pl.LightningModule):
             val_ood_datasets.append(load_dataset(data_dir, name, **val_args))
 
         self.val_datasets = HREDatasets(
-            val, val_ds_datasets, val_ood_datasets, length=val_length
+            self.val_id, val_ds_datasets, val_ood_datasets, length=val_length
         )
 
         # Test datasets
@@ -234,18 +234,14 @@ class HREModel(pl.LightningModule):
         self.min_performance = config["min_performance"]
         self.max_performance = config["max_performance"]
         self.num_adv = config["num_adv"]
-        total_weight = (
-            config["w_perf"]
-            + config["w_rob"]
-            + config["w_sec"]
-            + config["w_cal"]
-            + config["w_oodd"]
-        )
-        self.w_perf = config["w_perf"] / total_weight
-        self.w_rob = config["w_rob"] / total_weight
-        self.w_sec = config["w_sec"] / total_weight
-        self.w_cal = config["w_cal"] / total_weight
-        self.w_oodd = config["w_oodd"] / total_weight
+        
+        # HRE Weights
+        self.w_perf = config["w_perf"]
+        self.w_rob = config["w_rob"]
+        self.w_sec = config["w_sec"]
+        self.w_cal = config["w_cal"]
+        self.w_oodd = config["w_oodd"]
+        self.normalize_hre_weights()
 
         # Set up remaining configuration parameters
         self.num_workers = min(multiprocessing.cpu_count(), config["max_num_workers"])
@@ -255,12 +251,26 @@ class HREModel(pl.LightningModule):
         
         # Setup temperature for temp scaling
         self.T = 1
-        if config["calibration_method"] == "none":
+        if "calibration_method" not in config or config["calibration_method"] == "none":
             self.temperature_scale=False
         elif config["calibration_method"] == "temperature_scaling":
             print("Using temperature scaling")
             self.temperature_scale=True
 
+    def normalize_hre_weights(self):
+        total_weight = (
+            self.w_perf
+            + self.w_rob
+            + self.w_sec
+            + self.w_cal
+            + self.w_oodd
+        )
+        self.w_perf /= total_weight
+        self.w_rob /= total_weight
+        self.w_sec /= total_weight
+        self.w_cal /= total_weight
+        self.w_oodd /= total_weight
+        
     ## Pytorch Lightning functions
     def configure_optimizers(self):
         return self.optimizer(
@@ -280,10 +290,6 @@ class HREModel(pl.LightningModule):
         return loss
 
     def validation_step(self, val_batch, batch_idx):
-        if batch_idx==0 and self.temperature_scale:
-            print("Updating T...")
-            self.update_T()
-            
         return self.compute_all_needed_outputs(val_batch, batch_idx)
 
     def validation_epoch_end(self, validation_step_outputs):
@@ -347,12 +353,37 @@ class HREModel(pl.LightningModule):
 
     # We use AUROC as the default OOD detection metric
     def ood_detection(self):
-        ood_metrics = self.metrics.compute()
-        auroc = ood_metrics["AUROC"]
-        # We could threshold in either direction, so we take the best outcome
-        return max(auroc, 1 - auroc)
+        res = {}
+        for metric, ood_key in zip(self.metrics, self.ood_detectors):
+            ood_metrics = metric.compute()
+            auroc = ood_metrics["AUROC"]
+            # We could threshold in either direction, so we take the best outcome
+            res[ood_key] = max(auroc, 1 - auroc)
+        
+        return res
 
     def compute_all_needed_outputs(self, batch, batch_idx):
+        if batch_idx==0:
+            # Deal with calibration
+            if self.temperature_scale:
+                print("Calibrating T...")
+                self.update_T()
+            else:
+                self.T = 1
+                
+            # Fit any OOD detectors
+            print("fitting ood detectors...")
+            
+            # This collate function is able to ignore the iwilds metadata
+            def custom_collate_fn(batch):
+                x_batch, y_batch = zip(*[(x, y) for x, y, _ in batch])
+                return torch.stack(x_batch), torch.stack(y_batch)
+            
+            d = DataLoader(self.val_id, batch_size=self.batch_size, num_workers=self.num_workers, collate_fn=custom_collate_fn)
+            for ood_key in self.ood_detectors:
+                self.ood_detectors[ood_key].fit(d, device=self.device)
+            
+            
         with torch.inference_mode():
             # Compute predictions on id and ds datasets
             predictions = {
@@ -360,14 +391,18 @@ class HREModel(pl.LightningModule):
                 "ds": [self.predictions(b) for b in batch["ds"]],
             }
 
-            # OOD detection
-            if batch_idx == 0:
-                self.metrics = ood.utils.OODMetrics()
-
-            target = torch.ones(batch["id"][0].shape[0])
-            self.metrics.update(self.ood_detector(batch["id"][0]), target)
+        # OOD detection
+        if batch_idx == 0:
+            self.metrics = [ood.utils.OODMetrics() for _ in range(len(self.ood_detectors))]
+            
+        pos_target = torch.ones(batch["id"][0].shape[0])
+        for metric, ood_key in zip(self.metrics, self.ood_detectors):
+            print("updating ood metrics for ", ood_key)
+            ood_detector = self.ood_detectors[ood_key]
+            metric.update(ood_detector(batch["id"][0]), pos_target)
             for ood_batch in batch["ood"]:
-                self.metrics.update(self.ood_detector(ood_batch[0]), -1 * target)
+                neg_target = -1 * torch.ones(ood_batch[0].shape[0])
+                metric.update(ood_detector(ood_batch[0]), neg_target)
 
         # Compute adversarial predictions
         if batch_idx * self.batch_size < self.config["num_adv"]:
@@ -448,8 +483,16 @@ class HREModel(pl.LightningModule):
 
         return results
 
-    def ood_detection_info(self, ood_detection_metric, prefix):
-        return {prefix + "_ood_detection": ood_detection_metric}
+    def ood_detection_info(self, ood_detection_metrics, prefix):
+        meanval = 0
+        results = {}
+        for ood_key in ood_detection_metrics:
+            val = ood_detection_metrics[ood_key]
+            results[prefix + "_ood_detection_" + ood_key] = val
+            meanval += val
+        results[prefix + "_ood_detection"] = meanval / len(ood_detection_metrics)
+        
+        return results
 
     def hre_info(self, outputs, prefix, id_name, ds_names, ood_names):
         # ID
@@ -492,9 +535,10 @@ class HREModel(pl.LightningModule):
         )
 
         # OOD detection
-        ood_metric = self.ood_detection()
-        ood_results = self.ood_detection_info(ood_metric, prefix)
+        ood_metrics = self.ood_detection()
+        ood_results = self.ood_detection_info(ood_metrics, prefix)
 
+        # Combined score
         hre_score = (
             performance_results[prefix + "_performance_norm"] * self.w_perf
             + robustness_results[prefix + "_robustness"] * self.w_rob
@@ -530,7 +574,7 @@ class ClassificationTask(HREModel):
             freeze_weights(self.model, config["unfreeze_k_layers"])
 
 
-        if config["adversarial_training_method"] != None:
+        if "adversarial_training_method" in config and config["adversarial_training_method"] != None:
             atk_type = getattr(torchattacks, config["adversarial_training_method"])
             try:  # if expression or string
                 eps = eval(config["adversarial_training_eps"])
@@ -558,7 +602,16 @@ class ClassificationTask(HREModel):
         )
 
         # By default use an energy based OOD detector
-        self.ood_detector = ood.detector.EnergyBased(self.model)
+        self.ood_detectors = {"EnergyBased" : ood.detector.EnergyBased(self.model),
+                              "MaxSoftmax" : ood.detector.MaxSoftmax(self.model),
+                              "MaxLogit" : ood.detector.MaxLogit(self.model),
+                              "ODIN" : ood.detector.ODIN(self.model),
+                            #   "Mahalanobis" : ood.detector.Mahalanobis(self.model),
+                            #   "KLMatching" : ood.detector.KLMatching(self.model)
+                              }
+                              
+                              
+                              
 
         # By default use the cross entropy loss
         self.loss_fn = nn.CrossEntropyLoss(label_smoothing=config["label_smoothing"])

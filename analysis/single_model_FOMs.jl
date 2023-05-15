@@ -60,16 +60,6 @@ function domain_shift_calibration_relationships(dataset, dataset_name)
     plot(p2,p3,p5,p8, layout=(4, 1), size=(600, 400*4), left_margin=25Plots.mm)
 end
 
-function plot_metric_correlations(dataset_results; prefix="val", title="", colorbar=false)
-    syms = ["$(prefix)_performance","$(prefix)_robustness","$(prefix)_security","$(prefix)_calibration","$(prefix)_ood_detection"]
-    names = ["Performance", "Robustness", "Security", "Calibration", "Fault Detection"]
-
-    N = length(syms)
-    fn(x,y) = y < x ? NaN : correlation(dataset_results, syms[x], syms[y])
-    heatmap(1:N, 1:N, fn, cmap=:PiYG, clims=(-1,1), xrotation=45; title, colorbar)
-    xticks!(1:N, names)
-    yticks!(1:N, names)
-end
 
 function parallel_coord_mean_std(results, datasets, dataset_names, syms, names, p=plot())
     for (d, name) in zip(datasets, dataset_names)
