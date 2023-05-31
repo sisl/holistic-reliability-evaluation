@@ -25,6 +25,7 @@ torch.set_float32_matmul_precision("medium")
 
 torch.multiprocessing.set_sharing_strategy("file_system")
 
+dataset_cache = {} # used for caching datsets over multiple runs
 
 def swap_classifier(model, n_classes):
     if isinstance(model, torchvision.models.DenseNet):
@@ -164,14 +165,20 @@ class HREModel(pl.LightningModule):
         both_transforms = [tfs.Compose([*self.train_transforms, *self.eval_transforms])]
 
         # Load the train dataset
-        print("Loading train dataset...")
-        self.train_dataset = load_dataset(
-            data_dir,
-            config["train_dataset"],
-            self.size,
-            self.n_channels,
-            both_transforms,
-        )
+        dataset_name = ''.join([config["train_dataset"], *config["train_transforms"], *config["eval_transforms"]])
+        if dataset_name in dataset_cache:
+            self.train_dataset = dataset_cache[dataset_name]
+            print("Using cached train dataset")
+        else:
+            print("Loading train dataset...")
+            self.train_dataset = load_dataset(
+                data_dir,
+                config["train_dataset"],
+                self.size,
+                self.n_channels,
+                both_transforms,
+            )
+            dataset_cache[dataset_name] = self.train_dataset
 
         # Build the val and test datasets
         args = {
@@ -183,52 +190,73 @@ class HREModel(pl.LightningModule):
         # Validation datasets
         val_length = config["val_dataset_length"]
         val_args = {**args, "length": val_length}
-        print("Loading id-val dataset...")
-        self.val_id = load_dataset(
-            data_dir,
-            config["val_id_dataset"],
-            **val_args,
-        )
-        val_ds_datasets = []
-        for name in config["val_ds_datasets"]:
-            print("Loading val ds dataset: ", name, "...")
-            val_ds_datasets.append(load_dataset(data_dir, name, **val_args))
-        val_ood_datasets = []
-        for name in config["val_ood_datasets"]:
-            print("Loading val ood dataset: ", name, "...")
-            val_ood_datasets.append(load_dataset(data_dir, name, **val_args))
+        
+        ## Load the id-val dataset
+        val_id_dataset_name = ''.join([str(val_length), *config["eval_transforms"], config["val_id_dataset"]])
+        if val_id_dataset_name in dataset_cache:
+            print("Using cached val id dataset")
+            self.val_id = dataset_cache[val_id_dataset_name]
+        else:
+            print("Loading id-val dataset...")
+            self.val_id = load_dataset(
+                data_dir,
+                config["val_id_dataset"],
+                **val_args,
+            )
+            dataset_cache[val_id_dataset_name] = self.val_id
+        
+        val_dataset_names = ''.join([str(val_length), *config["eval_transforms"], config["val_id_dataset"], *config["val_ds_datasets"], *config["val_ood_datasets"]])
+        if val_dataset_names in dataset_cache:
+            self.val_datasets = dataset_cache[val_dataset_names]
+            print("Using cached val datasets")
+        else:
+            val_ds_datasets = []
+            for name in config["val_ds_datasets"]:
+                print("Loading val ds dataset: ", name, "...")
+                val_ds_datasets.append(load_dataset(data_dir, name, **val_args))
+            val_ood_datasets = []
+            for name in config["val_ood_datasets"]:
+                print("Loading val ood dataset: ", name, "...")
+                val_ood_datasets.append(load_dataset(data_dir, name, **val_args))
 
-        self.val_datasets = HREDatasets(
-            self.val_id, val_ds_datasets, val_ood_datasets, length=val_length
-        )
+            self.val_datasets = HREDatasets(
+                self.val_id, val_ds_datasets, val_ood_datasets, length=val_length
+            )
+            dataset_cache[val_dataset_names] = self.val_datasets
 
         # Test datasets
         test_length = config["test_dataset_length"]
         test_args = {**args, "length": test_length}
+        
+        test_dataset_names =  ''.join([str(test_length), *config["eval_transforms"], config["test_id_dataset"], *config["test_ds_datasets"], *config["test_ood_datasets"]])
+        if test_dataset_names in dataset_cache:
+            self.test_datasets = dataset_cache[test_dataset_names]
+            print("Using cached test datasets")
+        else:
+            print("Loading id-test dataset...")
+            test = load_dataset(
+                data_dir,
+                config["test_id_dataset"],
+                **test_args,
+            )
 
-        print("Loading id-test dataset...")
-        test = load_dataset(
-            data_dir,
-            config["test_id_dataset"],
-            **test_args,
-        )
+            test_ds_datasets = []
+            for name in config["test_ds_datasets"]:
+                print("Loading test ds dataset: ", name, "...")
+                test_ds_datasets.append(load_dataset(data_dir, name, **test_args))
 
-        test_ds_datasets = []
-        for name in config["test_ds_datasets"]:
-            print("Loading test ds dataset: ", name, "...")
-            test_ds_datasets.append(load_dataset(data_dir, name, **test_args))
+            test_ood_datasets = []
+            for name in config["test_ood_datasets"]:
+                print("Loading test ood dataset: ", name, "...")
+                test_ood_datasets.append(load_dataset(data_dir, name, **test_args))
 
-        test_ood_datasets = []
-        for name in config["test_ood_datasets"]:
-            print("Loading test ood dataset: ", name, "...")
-            test_ood_datasets.append(load_dataset(data_dir, name, **test_args))
-
-        self.test_datasets = HREDatasets(
-            test,
-            test_ds_datasets,
-            test_ood_datasets,
-            length=config["test_dataset_length"],
-        )
+            self.test_datasets = HREDatasets(
+                test,
+                test_ds_datasets,
+                test_ood_datasets,
+                length=config["test_dataset_length"],
+            )
+            dataset_cache[test_dataset_names] = self.test_datasets
 
         # Set the HRE parameters and weights
         self.min_performance = config["min_performance"]
@@ -366,14 +394,11 @@ class HREModel(pl.LightningModule):
         if batch_idx==0:
             # Deal with calibration
             if self.temperature_scale:
-                print("Calibrating T...")
                 self.update_T()
             else:
                 self.T = 1
                 
             # Fit any OOD detectors
-            print("fitting ood detectors...")
-            
             # This collate function is able to ignore the iwilds metadata
             def custom_collate_fn(batch):
                 x_batch, y_batch = zip(*[(x, y) for x, y, _ in batch])
@@ -397,7 +422,6 @@ class HREModel(pl.LightningModule):
             
         pos_target = torch.ones(batch["id"][0].shape[0])
         for metric, ood_key in zip(self.metrics, self.ood_detectors):
-            print("updating ood metrics for ", ood_key)
             ood_detector = self.ood_detectors[ood_key]
             metric.update(ood_detector(batch["id"][0]), pos_target)
             for ood_batch in batch["ood"]:
@@ -443,7 +467,6 @@ class HREModel(pl.LightningModule):
         
     # From: https://towardsdatascience.com/neural-network-calibration-using-pytorch-c44b7221a61
     def update_T(self):
-        print("Temperature scaling...")
         validation_data = self.val_dataloader()
         temperature = nn.Parameter(torch.ones(1).cuda())
         criterion = nn.CrossEntropyLoss()
@@ -496,14 +519,14 @@ class HREModel(pl.LightningModule):
 
     def hre_info(self, outputs, prefix, id_name, ds_names, ood_names):
         # ID
-        pred = torch.cat([d["id"]["pred"] for d in outputs])
-        y = torch.cat([d["id"]["y"] for d in outputs])
-        id_perf = self.performance_metric(pred, y).item()
+        id_pred = torch.cat([d["id"]["pred"] for d in outputs])
+        id_y = torch.cat([d["id"]["y"] for d in outputs])
+        id_perf = self.performance_metric(id_pred, id_y).item()
         performance_results = self.performance_info(id_perf, prefix)
 
         # DS
         ds_perfs = []
-        for i in range(len(self.config[f"val_ds_datasets"])):
+        for i in range(len(self.config[f"{prefix}_ds_datasets"])):
             pred = torch.cat([d["ds"][i]["pred"] for d in outputs])
             y = torch.cat([d["ds"][i]["y"] for d in outputs])
             perf = self.performance_metric(pred, y).item()
@@ -523,9 +546,9 @@ class HREModel(pl.LightningModule):
         security_results = self.security_info(adv_perf, id_perf, prefix, id_name)
 
         # Calibration
-        id_cal = self.calibration(pred, y)
+        id_cal = self.calibration(id_pred, id_y)
         ds_cals = []
-        for i in range(len(self.config[f"val_ds_datasets"])):
+        for i in range(len(self.config[f"{prefix}_ds_datasets"])):
             pred = torch.cat([d["ds"][i]["pred"] for d in outputs])
             y = torch.cat([d["ds"][i]["y"] for d in outputs])
             cal = self.calibration(pred, y)

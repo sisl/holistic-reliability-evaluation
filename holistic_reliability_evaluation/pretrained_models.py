@@ -13,7 +13,7 @@ from hre_model import ClassificationTask
 
 
 # This is used to load models that *we* have pretrained, not those from wilds.
-def load_model_descriptions(results_dir, dataset, phase="train"):
+def load_model_descriptions(results_dir, dataset, phase="train", config_overrides={}):
     model_descriptions = []
     
     datasets = os.listdir(results_dir)
@@ -36,17 +36,23 @@ def load_model_descriptions(results_dir, dataset, phase="train"):
                     ckpt = next(element for element in ckpts if "best_val" in element)
                     ckpt_path = os.path.join(seed_dir, s, "checkpoints", ckpt)
 
+                    # Do some sanity checks
+                    if config["algorithm"] != a:
+                        algname = config["algorithm"]
+                        print(f"Warning: algorithm name {algname} does not match directory name {a}")
+                    
+                    # NOTE: This is to handle the adversial sweep models which got reorganized by hand
+                    if config["algorithm"] != "adversarial_sweep" and config["algorithm"] != "model_sweep_adversarial":
+                        assert config["algorithm"] == a
+
                     # Function to call to construct the model
                     def loadckpt(args={}, config=config, ckpt_path=ckpt_path):
-                        print("config: ", config)
-                        print("args: ", args)
                         config.update(args)  # Update the config with the args
                         return ClassificationTask.load_from_checkpoint(
                             checkpoint_path=ckpt_path, config=config
                         )
 
                     model_descriptions.append((loadckpt, s))
-                    print(f"success: {dataset} {a} {s}, checkpoint: {ckpt}")
 
             except Exception as e:
                 print(f"error: {e}")

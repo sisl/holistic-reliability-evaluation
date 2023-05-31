@@ -1,14 +1,14 @@
 config:
-  accelerator: gpu
-  adversarial_training_method: null
-  algorithm: DANN
+  accelerator: "gpu"
+  adversarial_training_method: ~
+  algorithm: "DANN"
   batch_size: 1024
-  calibration_method: temperature_scaling
-  checkpoint_path: /scratch/users/acorso/wilds_models/camelyon17/wilds_v2.0/camelyon17_dann_coarse_testunlabeled_seed9/camelyon17_seed:9_epoch:best_model.pth
-  data_dir: /scratch/users/acorso/data/
+  calibration_method: "temperature_scaling"
+  checkpoint_path: "/scratch/users/acorso/wilds_models/camelyon17/wilds_v2.0/camelyon17_dann_coarse_testunlabeled_seed9/camelyon17_seed:9_epoch:best_model.pth"
+  data_dir: "/scratch/users/acorso/data/"
   devices: 1
   eval_transforms:
-  - wilds_default_normalization
+    - "wilds_default_normalization"
   freeze_weights: false
   inference_mode: false
   label_smoothing: 0.01
@@ -17,42 +17,42 @@ config:
   max_num_workers: 32
   max_performance: 1.0
   min_performance: 0.7
-  model: densenet121
-  model_source: torchvision
+  model: "densenet121"
+  model_source: "torchvision"
   n_channels: 3
   n_classes: 2
   num_adv: 128
-  optimizer: adam
-  phase: train
-  pretrained_weights: DEFAULT
-  save_folder: /mnt/data/acorso/results/
+  optimizer: "adam"
+  phase: "train"
+  pretrained_weights: "DEFAULT"
+  save_folder: "/mnt/data/acorso/results/"
   seed: 9
   size:
-  - 96
-  - 96
+    - 96
+    - 96
   test_dataset_length: 1024
   test_ds_datasets:
-  - camelyon17-test
-  - camelyon17-id_test-corruption1_test
-  test_id_dataset: camelyon17-id_test
+    - "camelyon17-test"
+    - "camelyon17-id_test-corruption1_test"
+  test_id_dataset: "camelyon17-id_test"
   test_ood_datasets:
-  - gaussian_noise
-  - fmow-id_test
-  - rxrx1-id_test
-  - iwildcam-id_test
-  train_dataset: camelyon17-train
+    - "gaussian_noise"
+    - "fmow-id_test"
+    - "rxrx1-id_test"
+    - "iwildcam-id_test"
+  train_dataset: "camelyon17-train"
   train_transforms: []
   unfreeze_k_layers: 0
   val_dataset_length: 1024
   val_ds_datasets:
-  - camelyon17-val
-  - camelyon17-id_val-corruption1_val
-  val_id_dataset: camelyon17-id_val
+    - "camelyon17-val"
+    - "camelyon17-id_val-corruption1_val"
+  val_id_dataset: "camelyon17-id_val"
   val_ood_datasets:
-  - gaussian_noise
-  - fmow-id_val
-  - rxrx1-id_val
-  - iwildcam-id_val
+    - "gaussian_noise"
+    - "fmow-id_val"
+    - "rxrx1-id_val"
+    - "iwildcam-id_val"
   w_cal: 0.2
   w_oodd: 0.2
   w_perf: 0.2

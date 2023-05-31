@@ -158,6 +158,8 @@ def get_predefined_transforms(transform_strings, config):
             transforms.append(standardize_transform())
         elif transform_name == "random_rotation":
             transforms.append(random_rotation_transform())
+        elif transform_name == "random_horizontal_flip":
+            transforms.append(tfs.RandomHorizontalFlip())
         elif transform_name == "pretrain_default": 
             model = config["model"]
             weights = config["pretrained_weights"]

@@ -82,6 +82,39 @@ def parse_args():
     
     return parser.parse_args()
 
+## This function ensures that all models get evaluated on the same datasets regardless of their configs
+def get_datasets(dataset):
+    if dataset == "iwildcam":
+        return {"test_ds_datasets": ["iwildcam-test", "iwildcam-id_test-corruption1_test"],
+                "test_id_dataset": "iwildcam-id_test",
+                "test_ood_datasets": ["gaussian_noise", "fmow-id_test", "rxrx1-id_test", "camelyon17-id_test"],
+                "val_ds_datasets": ["iwildcam-val", "iwildcam-id_val-corruption1_val"],
+                "val_id_dataset": "iwildcam-id_val",
+                "val_ood_datasets": ["gaussian_noise", "fmow-id_val", "rxrx1-id_val", "camelyon17-id_val"],}
+    elif dataset == "camelyon17":
+        return {"test_ds_datasets": ["camelyon17-test", "camelyon17-id_test-corruption1_test"],
+                "test_id_dataset": "camelyon17-id_test",
+                "test_ood_datasets": ["gaussian_noise", "fmow-id_test", "rxrx1-id_test", "iwildcam-id_test"],
+                "val_ds_datasets": ["camelyon17-val", "camelyon17-id_val-corruption1_val"],
+                "val_id_dataset": "camelyon17-id_val",
+                "val_ood_datasets": ["gaussian_noise", "fmow-id_val", "rxrx1-id_val", "iwildcam-id_val"],}
+    elif dataset == "fmow":
+        return {"test_ds_datasets": ["fmow-test", "fmow-id_test-corruption1_test"],
+                "test_id_dataset": "fmow-id_test",
+                "test_ood_datasets": ["gaussian_noise", "camelyon17-id_test", "rxrx1-id_test", "iwildcam-id_test"],
+                "val_ds_datasets": ["fmow-val", "fmow-id_val-corruption1_val"],
+                "val_id_dataset": "fmow-id_val",
+                "val_ood_datasets": ["gaussian_noise", "camelyon17-id_val", "rxrx1-id_val", "iwildcam-id_val"],}
+    elif dataset == "rxrx1":
+        return {"test_ds_datasets": ["rxrx1-test", "rxrx1-id_test-corruption1_test"],
+                "test_id_dataset": "rxrx1-id_test",
+                "test_ood_datasets": ["gaussian_noise", "camelyon17-id_test", "fmow-id_test", "iwildcam-id_test"],
+                "val_ds_datasets": ["rxrx1-val", "rxrx1-id_val-corruption1_val"],
+                "val_id_dataset": "rxrx1-id_val",
+                "val_ood_datasets": ["gaussian_noise", "camelyon17-id_val", "fmow-id_val", "iwildcam-id_val"],}
+    else:
+        raise ValueError("Dataset {} not supported".format(dataset))
+    
 
 def run_evaluate():
     args = parse_args()
@@ -92,7 +125,9 @@ def run_evaluate():
         "test_dataset_length" : args.eval_size,
         "calibration_method" : args.calibration_method,
         "inference_mode" : args.inference_mode,
-        "data_dir" : args.data_dir
+        "data_dir" : args.data_dir,
+        "num_adv" : 128,
+        **get_datasets(args.dataset)
     }
     
     if args.inference_mode:

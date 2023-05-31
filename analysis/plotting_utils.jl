@@ -43,7 +43,7 @@ function load_results(results_dir; self_trained=false, phase="train")
             for s in seeds
                 try
                     results = CSV.read(joinpath(seed_dir, s, "metrics.csv"), DataFrame)
-                    params = YAML.load_file(joinpath(seed_dir, s, "hparams.yaml"))
+                    params = YAML.load_file(joinpath(seed_dir, s, "hparams.yaml"); dicttype=OrderedDict{Any, Any})
                     # if "test_performance" in names(results)
                     evaluation_results[d][a][s] = (results, params)
                     # end
@@ -101,10 +101,10 @@ function get_perf(dataset_results, sym, alg; version=nothing, requires=nothing)
         val = v[findlast(nonmissing)]
 
         # TODO: Find a better way to filter outliers
-        if sym=="val_performance" && val < 0.3
-            println("found 1")
-            continue
-        end
+        # if sym=="val_performance" && val < 0.3
+        #     println("found 1")
+        #     continue
+        # end
 
         # Push back the value
         push!(versions, ver)
@@ -156,6 +156,32 @@ function correlation(dataset_results, symx, symy)
 
     # double check that the metrics have appropriate variation
     correlation(allx, ally)
+end
+
+function scatter_fit(allx, ally; p=plot(), show_yeqx=false, scale_yeqx=true)
+
+    xmin = minimum(allx)
+    ymin = minimum(ally)
+
+    xmax = maximum(allx)
+    ymax = maximum(ally)
+
+    # Compute the r2 value using GLM.jl
+    model = lm(@formula(y ~ x), DataFrame(x=allx, y=ally))
+    R = r2(model)
+
+    scatter!(p, allx, ally, color=:black, alpha=0.3, markerstroke=:auto, label="")
+    if show_yeqx
+        if scale_yeqx
+            minval = max(xmin, ymin)
+            maxval = min(xmax, ymax)
+        else
+            minval, maxval = 0,1
+        end
+        plot!(p, minval:0.001:maxval, minval:0.001:maxval, color=:black, linestyle=:dash, alpha=0.5, label="\$y=x\$")
+    end
+
+    plot!(p, allx, allx .* coef(model)[2] .+ coef(model)[1], color=:black, label="\$R^2\$ = $(round(R, digits=2))")
 end
 
 
@@ -229,7 +255,7 @@ function single_metric_comp(results, metric, metric_name, baseline_algs, compari
         ribbon_maxs = baselinemax*ones(length(ys))
         ribbon_xs, ribbon_ys = make_hribbon_shape(ys, xs, [ribbon_mins, ribbon_maxs])
         plot!(p, xs, ys, linestyle=:dash)
-        plot!(ribbon_xs, ribbon_ys, fill=true, linewidth=0, fillalpha = 0.5,  fillcolor=:lightblue,label=nothing)
+        plot!(ribbon_xs, ribbon_ys, fill=true, linewidth=0, fillalpha = 0.5, fillcolor=:lightblue, color=:lightblue, alpha=0.5, label=nothing)
     end
     
     plot!(size=(500,200), legend=false, xlabel=metric_name, framestyle=nothing, bottom_margin=5Plots.mm)
@@ -246,10 +272,20 @@ function single_metric_comp(results, metric, metric_name, baseline_algs, compari
 end
 
 
-function plot_correlations(arrs, names; kwargs...)
+function plot_correlations(arrs, names; annotate_rval =true, kwargs...)
     N = length(names)
     fn(x,y) = y < x ? NaN : correlation(arrs[x], arrs[y])
     heatmap(1:N, 1:N, fn, cmap=:PiYG, clims=(-1,1), xrotation=45; colorbar=true, kwargs...)
+    if annotate_rval
+        for x in 1:N
+            for y in x:N
+                if x == y
+                    continue
+                end
+                annotate!(x, y, (string(round(fn(x,y)^2, digits=2)), 10))
+            end
+        end
+    end
     xticks!(1:N, names)
     yticks!(1:N, names)
 end

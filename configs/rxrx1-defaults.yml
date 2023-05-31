@@ -9,7 +9,9 @@ n_classes: 1139
 train_dataset: rxrx1-train
 size: [256, 256]
 n_channels: 3
-train_transforms: []
+train_transforms:
+  - random_rotation
+  - random_horizontal_flip
 eval_transforms: [wilds_default_standardize]
 # These are for scaling the performance:
 min_performance: 0.
@@ -23,7 +25,7 @@ devices: 1
 # Training params - (Many of these are likely going to be tuned)
 max_epochs: 90
 lr: 0.001
-batch_size: 32
+batch_size: 72
 optimizer: adam
 model_source: torchvision
 model: resnet50

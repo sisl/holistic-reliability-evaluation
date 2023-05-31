@@ -1,0 +1,59 @@
+config:
+  accelerator: gpu
+  algorithm: torchvision_efficientnet_v2_l_IMAGENET1K_V1
+  batch_size: 24
+  calibration_method: temperature_scaling
+  data_dir: /scratch/users/acorso/data/
+  devices: 1
+  eval_transforms:
+  - pretrain_default
+  finetune_experimets: true
+  freeze_weights: true
+  inference_mode: false
+  label_smoothing: 0.0
+  lr: 0.008817972090698538
+  max_epochs: 5
+  max_num_workers: 32
+  max_performance: 1.0
+  min_performance: 0.7
+  model: efficientnet_v2_l
+  model_source: torchvision
+  n_channels: 3
+  n_classes: 2
+  num_adv: 128
+  optimizer: adamw
+  phase: train
+  pretrained_weights: IMAGENET1K_V1
+  save_folder: /mnt/data/acorso/results/
+  seed: 4
+  size:
+  - 224
+  - 224
+  test_dataset_length: 1024
+  test_ds_datasets:
+  - camelyon17-test
+  - camelyon17-id_test-corruption1_test
+  test_id_dataset: camelyon17-id_test
+  test_ood_datasets:
+  - gaussian_noise
+  - fmow-id_test
+  - rxrx1-id_test
+  - iwildcam-id_test
+  train_dataset: camelyon17-train
+  train_transforms: []
+  unfreeze_k_layers: 1
+  val_dataset_length: 1024
+  val_ds_datasets:
+  - camelyon17-val
+  - camelyon17-id_val-corruption1_val
+  val_id_dataset: camelyon17-id_val
+  val_ood_datasets:
+  - gaussian_noise
+  - fmow-id_val
+  - rxrx1-id_val
+  - iwildcam-id_val
+  w_cal: 0.2
+  w_oodd: 0.2
+  w_perf: 0.2
+  w_rob: 0.2
+  w_sec: 0.2

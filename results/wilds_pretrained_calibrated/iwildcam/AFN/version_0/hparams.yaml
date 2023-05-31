@@ -1,14 +1,14 @@
 config:
-  accelerator: gpu
-  adversarial_training_method: null
-  algorithm: AFN
+  accelerator: "gpu"
+  adversarial_training_method: ~
+  algorithm: "AFN"
   batch_size: 24
-  calibration_method: temperature_scaling
-  checkpoint_path: /scratch/users/acorso/wilds_models/iwildcam/wilds_v2.0/iwildcam_afn_extraunlabeled_seed0/iwildcam_seed_0_epoch_best_model.pth
-  data_dir: /scratch/users/acorso/data/
+  calibration_method: "temperature_scaling"
+  checkpoint_path: "/scratch/users/acorso/wilds_models/iwildcam/wilds_v2.0/iwildcam_afn_extraunlabeled_seed0/iwildcam_seed_0_epoch_best_model.pth"
+  data_dir: "/scratch/users/acorso/data/"
   devices: 1
   eval_transforms:
-  - wilds_default_normalization
+    - "wilds_default_normalization"
   freeze_weights: false
   inference_mode: false
   label_smoothing: 0.0
@@ -17,42 +17,42 @@ config:
   max_num_workers: 32
   max_performance: 1.0
   min_performance: 0.0
-  model: resnet50
-  model_source: torchvision
+  model: "resnet50"
+  model_source: "torchvision"
   n_channels: 3
   n_classes: 182
   num_adv: 128
-  optimizer: adam
-  phase: train
-  pretrained_weights: DEFAULT
-  save_folder: /mnt/data/acorso/results/
+  optimizer: "adam"
+  phase: "train"
+  pretrained_weights: "DEFAULT"
+  save_folder: "/mnt/data/acorso/results/"
   seed: 0
   size:
-  - 448
-  - 448
+    - 448
+    - 448
   test_dataset_length: 1024
   test_ds_datasets:
-  - iwildcam-test
-  - iwildcam-id_test-corruption1_test
-  test_id_dataset: iwildcam-id_test
+    - "iwildcam-test"
+    - "iwildcam-id_test-corruption1_test"
+  test_id_dataset: "iwildcam-id_test"
   test_ood_datasets:
-  - gaussian_noise
-  - fmow-id_test
-  - rxrx1-id_test
-  - camelyon17-id_test
-  train_dataset: iwildcam-train
+    - "gaussian_noise"
+    - "fmow-id_test"
+    - "rxrx1-id_test"
+    - "camelyon17-id_test"
+  train_dataset: "iwildcam-train"
   train_transforms: []
   unfreeze_k_layers: 0
   val_dataset_length: 1024
   val_ds_datasets:
-  - iwildcam-val
-  - iwildcam-id_val-corruption1_val
-  val_id_dataset: iwildcam-id_val
+    - "iwildcam-val"
+    - "iwildcam-id_val-corruption1_val"
+  val_id_dataset: "iwildcam-id_val"
   val_ood_datasets:
-  - gaussian_noise
-  - fmow-id_val
-  - rxrx1-id_val
-  - camelyon17-id_val
+    - "gaussian_noise"
+    - "fmow-id_val"
+    - "rxrx1-id_val"
+    - "camelyon17-id_val"
   w_cal: 0.2
   w_oodd: 0.2
   w_perf: 0.2
