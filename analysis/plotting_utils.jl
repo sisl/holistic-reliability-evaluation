@@ -1,4 +1,26 @@
-using Plots; default(fontfamily="Computer Modern", framestyle=:box)
+using Plots; 
+
+Plots.reset_defaults()
+pgfplotsx()
+default(
+    thickness_scaling=1/2,
+    palette=:seaborn_dark,
+    titlefont=32,
+    legendfontsize=24,
+    guidefontsize=24,
+    tickfontsize=24,
+    colorbartickfontsizes=24,
+    framestyle=:box,
+    grid=true,
+    linewidth=2,
+    markersize=8,
+    legend=:topleft,
+    left_margin=5Plots.mm,
+    size=(400,350),
+    legend_font_halign=:left,
+    fg_legend = RGBA(0,0,0,0.5),
+)
+
 using Plots.PlotMeasures
 using CSV
 using YAML
@@ -170,7 +192,7 @@ function scatter_fit(allx, ally; p=plot(), show_yeqx=false, scale_yeqx=true)
     model = lm(@formula(y ~ x), DataFrame(x=allx, y=ally))
     R = r2(model)
 
-    scatter!(p, allx, ally, color=:black, alpha=0.3, markerstroke=:auto, label="")
+    scatter!(p, allx, ally, color=:black, alpha=0.3, markerstrokealpha=0, label="")
     if show_yeqx
         if scale_yeqx
             minval = max(xmin, ymin)
@@ -178,57 +200,10 @@ function scatter_fit(allx, ally; p=plot(), show_yeqx=false, scale_yeqx=true)
         else
             minval, maxval = 0,1
         end
-        plot!(p, minval:0.001:maxval, minval:0.001:maxval, color=:black, linestyle=:dash, alpha=0.5, label="\$y=x\$")
+        plot!(p, minval:0.001:maxval, minval:0.001:maxval, color=:black, linestyle=:dash, alpha=0.5, label=L"$y=x$")
     end
 
-    plot!(p, allx, allx .* coef(model)[2] .+ coef(model)[1], color=:black, label="\$R^2\$ = $(round(R, digits=2))")
-end
-
-
-function plot_relationship(dataset_results, symx, symy; p=plot(), normx=nothing, normy=nothing, label_alg=false, show_yeqx=false, scale_yeqx=true)
-    xvals, xalgs = get_all_by_alg(dataset_results, symx, requires=symy)
-    yvals, yalgs = get_all_by_alg(dataset_results, symy, requires=symx)
-    @assert xalgs == yalgs
-    algs = xalgs
-
-    if !isnothing(normx)
-        xnorms, _ = get_all_by_alg(dataset_results, normx)
-        xvals = [x ./ norm for (x, norm) in zip(xvals, xnorms)]
-    end
-    if !isnothing(normy)
-        ynorms, _ = get_all_by_alg(dataset_results, normy)
-        yvals = [y ./ norm for (y, norm) in zip(yvals, ynorms)]
-    end
-    
-    # Flatten for computing the linear fit
-    allx = vcat(xvals...)
-    ally = vcat(yvals...)
-
-    xmin = minimum(allx)
-    ymin = minimum(ally)
-
-    xmax = maximum(allx)
-    ymax = maximum(ally)
-
-    # Compute the r2 value using GLM.jl
-    model = lm(@formula(y ~ x), DataFrame(x=allx, y=ally))
-    R = r2(model)
-
-    # Plot the linear fit
-    for (x, y, alg) in zip(xvals, yvals, algs)
-        scatter!(p, x, y, color=string_to_color(alg), label=label_alg ? alg : "", markerstrokecolor=:auto)
-    end
-    if show_yeqx
-        if scale_yeqx
-            minval = max(xmin, ymin)
-            maxval = min(xmax, ymax)
-        else
-            minval, maxval = 0,1
-        end
-        plot!(p, minval:0.001:maxval, minval:0.001:maxval, color=:black, linestyle=:dash, alpha=0.5, label="\$y=x\$")
-    end
-
-    plot!(p, allx, allx .* coef(model)[2] .+ coef(model)[1], color=:black, label="\$R^2\$ = $(round(R, digits=2))")
+    plot!(p, allx, allx .* coef(model)[2] .+ coef(model)[1], color=:black, label=L"$R^2$ = %$(round(R, digits=2))")
 end
 
 function make_hribbon_shape(ys, values, ribbon_bounds)
@@ -240,14 +215,22 @@ function make_hribbon_shape(ys, values, ribbon_bounds)
     return xs, ys
 end
 
-function single_metric_comp(results, metric, metric_name, baseline_algs, comparison_algs; ytick_label=true)
-    p = plot()
+function single_metric_comp(results, metric, metric_name, baseline_algs, comparison_algs; ytick_label=true, kwargs...)
+    p = plot(;kwargs...)
     N = length(comparison_algs)
     ys = [-0.1, 0.1*N]
 
     # If comparing to a baseline
     if !isnothing(baseline_algs)
-        baseline = vcat([get_perf(results, metric, alg) for alg in baseline_algs]...)
+        baseline = []
+        for alg in baseline_algs
+            try
+                baseline = [baseline; get_perf(results, metric, alg)]
+            catch
+                @warn "Failed to get baseline for $alg"
+            end
+        end
+        # baseline = vcat([get_perf(results, metric, alg) for alg in baseline_algs]...)
         μbaseline = mean(baseline)
         baselinemin, baselinemax = extrema(baseline)
         xs = μbaseline*ones(length(ys))
@@ -255,37 +238,50 @@ function single_metric_comp(results, metric, metric_name, baseline_algs, compari
         ribbon_maxs = baselinemax*ones(length(ys))
         ribbon_xs, ribbon_ys = make_hribbon_shape(ys, xs, [ribbon_mins, ribbon_maxs])
         plot!(p, xs, ys, linestyle=:dash)
-        plot!(ribbon_xs, ribbon_ys, fill=true, linewidth=0, fillalpha = 0.5, fillcolor=:lightblue, color=:lightblue, alpha=0.5, label=nothing)
+        plot!(ribbon_xs, ribbon_ys, fill=true, linewidth=0, fillalpha = 0.3, fillcolor=:lightblue, color=:lightblue, alpha=0, label=nothing)
     end
     
-    plot!(size=(500,200), legend=false, xlabel=metric_name, framestyle=nothing, bottom_margin=5Plots.mm)
+    plot!(size=(500,200), legend=false, xlabel=metric_name, bottom_margin=5Plots.mm)
     if ytick_label
         yticks!(0:0.1:0.1*(N-1), collect(keys(comparison_algs)))
     else
         yticks!(0:0.1:0.1*(N-1), fill("", N))
     end
     for (i,(name, algs)) in enumerate(comparison_algs)
-        vs = vcat([get_perf(results, metric, c) for c in algs]...)
-        scatter!(vs, (i-1)*0.1*ones(length(vs)), alpha=0.7, markersize=7, markerstrokewidth=0)
+        vs = []
+        for alg in algs
+            try
+                vs = [vs; get_perf(results, metric, alg)]
+            catch
+                @warn "Failed to get results for $alg"
+            end
+        end
+        # vs = vcat([get_perf(results, metric, c) for c in algs]...)
+        scatter!(vs, (i-1)*0.1*ones(length(vs)), alpha=0.5, markersize=7, markerstrokealpha=0)
     end
     p
 end
 
 
-function plot_correlations(arrs, names; annotate_rval =true, kwargs...)
+function plot_correlations(arrs, names; ylabels=true, annotate_rval=true, kwargs...)
     N = length(names)
     fn(x,y) = y < x ? NaN : correlation(arrs[x], arrs[y])
-    heatmap(1:N, 1:N, fn, cmap=:PiYG, clims=(-1,1), xrotation=45; colorbar=true, kwargs...)
+    p = heatmap(1:N, 1:N, fn, cmap=:PiYG, clims=(-1,1), xrotation=45; colorbar=true, alpha=1, kwargs...)
     if annotate_rval
         for x in 1:N
             for y in x:N
                 if x == y
                     continue
                 end
-                annotate!(x, y, (string(round(fn(x,y)^2, digits=2)), 10))
+                annotate!(x, y, (string(round(fn(x,y)^2, digits=2)), 28))
             end
         end
     end
-    xticks!(1:N, names)
-    yticks!(1:N, names)
+    xticks!(0.5:N-0.5,  names)
+    if ylabels
+        yticks!(1:N, names)
+    else
+        yticks!(1:N, fill("", N))
+    end
+    p
 end

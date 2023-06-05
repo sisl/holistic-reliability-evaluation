@@ -23,7 +23,7 @@ devices: 1
 # Training params - (Many of these are likely going to be tuned)
 max_epochs: 15
 lr: 0.001
-batch_size: 1024
+batch_size: 24
 optimizer: adam
 model_source: torchvision
 model: densenet121

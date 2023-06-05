@@ -80,6 +80,12 @@ def parse_args():
     # Set the data directory (it might have been set by someone else in the config we load)
     parser.add_argument("--data_dir", default="/scratch/users/acorso/data/")
     
+    # Decide whether or not to validate the model
+    parser.add_argument("--validate", type=bool, default=True)
+    
+    # Decide whether or not to test the model
+    parser.add_argument("--test", type=bool, default=True)
+    
     return parser.parse_args()
 
 ## This function ensures that all models get evaluated on the same datasets regardless of their configs
@@ -115,8 +121,7 @@ def get_datasets(dataset):
     else:
         raise ValueError("Dataset {} not supported".format(dataset))
     
-
-def run_evaluate():
+def process_args():
     args = parse_args()
     
     # Setup the changes to the configuration
@@ -156,10 +161,15 @@ def run_evaluate():
 
     # combine results_dir with dataset name
     save_dir = os.path.join(args.save_dir, args.dataset)
+    return model_descriptions, config_args, args, save_dir
+    
+
+def run_evaluate():
+    model_descriptions, config_args, args, save_dir = process_args()
 
     # Evaluate the models
     for modelfn, ver in model_descriptions:
-        evaluate(modelfn(config_args), save_dir, version=ver)
+        evaluate(modelfn(config_args), save_dir, version=ver, validate=args.validate, test=args.test)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,11 @@
 import torch
 import torch.nn as nn
+from tqdm import tqdm
+import copy
+import random
+from torch.utils.data import DataLoader
+from hre_datasets import get_subset
+
 import numpy as np
 
 import argparse
@@ -15,183 +21,136 @@ class EnsembleClassifier(nn.Module):
     def __init__(self, models):
         super().__init__()
         self.models = nn.ModuleList(models)
-        self.softmax = nn.Softmax(dim=1)
+        num_models = len(models)
+        self.weights = nn.Parameter(torch.ones(num_models) / num_models)
+        self.NVal = 1024
+        self.device = torch.device("cuda")
+        self.fit_seed = 1234
+        self.val_seed = 5678
 
     def forward(self, x):
         outputs = []
 
-        for model in self.models:
+        for i, model in enumerate(self.models):
             output = model(x)
-            # probabilities = self.softmax(output)
+            weight = self.weights[i]
+            output = output * weight
             outputs.append(output)
 
-        ensemble_output = torch.stack(outputs).mean(dim=0)
+        ensemble_output = torch.stack(outputs).sum(dim=0)
         
         return ensemble_output
 
-# Function to evaluate the hre score of an ensemble of models
-def eval_hre(model_set, save_dir, eval_size=1024):
-    # Pull the first config file
-    config = model_set[0][0]["config"]
+    def val_dataset(self, seed):
+        random.seed(seed)
+        d = DataLoader(get_subset(self.models[0].val_id, self.NVal), batch_size=32, num_workers=32)
+        random.seed()
+        return d
     
-    models = []
-    names = []
-    for (model_desc, seed) in model_set:
-        load_fn = model_desc["load_fn"]
-        filename_fn = model_desc["filename_fn"]
-        args = model_desc["args"]
-        model = load_fn(filename_fn(seed), config["n_classes"], **args)
-        models.append(model)
-        names.append(model_desc["name"] + "_" + str(seed))
-    
-    # Ensemble the models
-    model = EnsembleClassifier(models)
-    
-    # join the names
-    model_name = "_".join(names)
-    
-    # Set the seed to 0, since we are combining models
-    config["seed"] = 0 
-    
-    # Disable adversarial evaluatiuon for now
-    config["num_adv"] = 0
-    config["w_sec"] = 0.0
-    
-    config["algorithm"] = model_name
-    
-    # Set the evaluation size
-    config["val_dataset_length"] = eval_size
-    config["val_batch_size"] = eval_size
-    config["test_dataset_length"] = eval_size
-    
-    # Evaluate and return the result of the val_hre_score
-    res_dict = evaluate(config, model, save_dir, inference_mode=True, return_results=True)
-    return float(res_dict[0]["val_hre_score"])
-
-def cumulative_ensemble(model_descriptions, name, save_dir, eval_size=1024):
-    model_set = []
-    best_model_set = []
-    best_hre = 0
-    
-    # Get the model description for the given name
-    md = next(md for md in model_descriptions if md["name"] == name)
-    
-    for i in range(md["Nseeds"]):
-        model_set.append((md, i))
+    def fit_weights(self):
+        validation_data = self.val_dataset(self.fit_seed)
+        device = self.device
+        criterion = nn.CrossEntropyLoss()
+        optimizer = torch.optim.LBFGS([self.weights], lr=0.001, max_iter=10000, line_search_fn='strong_wolfe')
         
-        # Evaluate the new model set 
-        hre = eval_hre(model_set, save_dir, eval_size)
-        # If there is an improvement, update the best model set 
-        if hre > best_hre:
-            best_hre = hre
-            best_model_set = model_set.copy()
-            print(f"New best hre: {best_hre}")
-            print(f"New best model set size: {len(best_model_set)}")
-    return best_model_set, best_hre
-    
-# Tries adding one model at a time, and keeps the model that leads to the best val hre score
-def greedy_ensemble(model_descriptions, n_greedy_iterations, n_samples, save_dir, eval_size=1024):
-    best_model_set = []
-    best_hre = 0
+        logits_lists = [[] for _ in range(len(self.models))]
+        labels_list = []
+        
+        progress_bar = tqdm(validation_data)  # Create a tqdm progress bar
+        for batch in progress_bar:
+            x, y = batch[0].to(device), batch[1].to(device)
+            labels_list.append(y)
+            
+            for (model, logits_list) in zip(self.models, logits_lists):
+                model.eval()
+                with torch.no_grad():
+                    logits_list.append(model(x))
+                    
+        
+        # Create tensors
+        logits_list = [torch.cat(logits_list).to(device) for logits_list in logits_lists]
+        labels_list = torch.cat(labels_list).to(device)
+        
+        def _eval():
+            optimizer.zero_grad()  # Reset gradients
+            
+            # compute logits with the weights
+            weighted_logits_list = []
 
-    # Number of iterations of greedily adding models
-    for k in range(n_greedy_iterations):
-        last_model_set = best_model_set.copy()
-        found_better = False
-        for i in range(n_samples):
-            # Start fresh from the best model set of the last iteration
-            trial_model_set = last_model_set.copy()
-            
-            # Get a random new model (by specifying the model index and seed)
-            model_index = np.random.randint(len(model_descriptions))
-            seed = np.random.randint(model_descriptions[model_index]["Nseeds"])
-            
-            # Add the new model to the model_set
-            trial_model_set.append((model_descriptions[model_index], seed))
-            
-            # Evaluate the new model set 
-            hre = eval_hre(trial_model_set, save_dir, eval_size)
-            
-            # If there is an improvement, update the best model set 
-            if hre > best_hre:
-                best_hre = hre
-                best_model_set = trial_model_set.copy()
-                found_better = True
-                print(f"New best hre: {best_hre}")
-                print(f"New best model set size: {len(best_model_set)}")
-        if not found_better:
-            break
+            for i, logits in enumerate(logits_list):
+                weighted_logits = logits * self.weights[i]
+                weighted_logits_list.append(weighted_logits)
+
+            logits = torch.stack(weighted_logits_list).sum(dim=0)
+            loss = criterion(logits, labels_list)
+            loss.backward()
+            return loss.item()
+        optimizer.step(_eval)
+        
+    def eval_accuracy(self):
+        self.eval()
+        val_dataset = self.val_dataset(self.val_seed)
+        correct = 0
+        total = 0
+        progress_bar = tqdm(val_dataset)  # Create a tqdm progress bar
+        
+        for batch in progress_bar:
+            x, y = batch[0].to(self.device), batch[1].to(self.device)
+            with torch.no_grad():
+                logits = self.forward(x)
+                pred = logits.argmax(dim=1)
+                correct += (pred == y).sum().item()
+                total += len(y)
                 
-    return best_model_set, best_hre
+            # Update the progress bar with the current iteration count
+            progress_bar.set_description(f"Accuracy: {correct / total:.4f}")
+        
+        return correct / total
+        
 
-# Tries random subsets of models and picks the subset with the highest val hre score
-def random_ensemble(model_descriptions, n_samples, save_dir, eval_size=1024, max_subset_size=10):
-    ## Randomly select subsets (up to 10) and compute hre score
-    best_model_set = {}
-    best_hre = 0
-    for k in range(n_samples):
-        trial_model_set = []
-        
-        # Sample number of models in the subset
-        Nmodels = np.random.randint(max_subset_size)+1
-        for i in range(Nmodels):
-            # Get a random new model (by specifying the model index and seed)
-            model_index = np.random.randint(len(model_descriptions))
-            seed = np.random.randint(model_descriptions[model_index]["Nseeds"])
+def select_best_ensemble(models, config_args, Nensemble, Ntrials):
+    random.seed()
+    best_accuracy = 0
+    best_ensemble = None
+    for i in range(Ntrials):
+        indices = random.sample(range(len(models)), Nensemble)
+        print(f"Trial {i}: {indices}")
+        model_subset = [models[i][0](config_args).to(torch.device("cuda")) for i in indices]
+        ens = EnsembleClassifier(model_subset)
+        ens.fit_weights()
+        acc = ens.eval_accuracy()
+        if acc > best_accuracy:
+            print(f"New best accuracy: {acc}")
+            best_accuracy = acc
+            best_ensemble = ens
             
-            # Add the new model to the model_set
-            trial_model_set.append((model_descriptions[model_index], seed))
-        
-        
-        # Evaluate the new model set 
-        hre = eval_hre(trial_model_set, save_dir, eval_size)
-            
-        # If there is an improvement, update the best model set 
-        if hre > best_hre:
-            best_hre = hre
-            best_model_set = trial_model_set.copy()
-            print(f"New best hre: {best_hre}")
-            print(f"New best model set size: {len(best_model_set)}")
-                
-    return best_model_set, best_hre
+    return best_ensemble
     
 
-## Setup the arguments that can be handled
-parser = argparse.ArgumentParser()
-parser.add_argument("--dataset")  # Name of the wilds datset to evaluate
-parser.add_argument("--model_dir") # Directory where the models are stored
-parser.add_argument("--save_dir") # Directory where the results should be stored
-parser.add_argument("--eval_size", type=int, default=1024) # Number of samples to evaluate on 
-parser.add_argument("--ensemble_builder") # cumulative, greedy, random
-parser.add_argument("--algorithm", default="not_specificed") # Algorithm used for the cumulative ensemble
-parser.add_argument("--n_greedy_iterations", type=int, default=10)  # Number of greedy iterations
-parser.add_argument("--n_samples", type=int, default=10) # Number of inner iterations (samples) for the greedy ensemble, or total samples for random 
-args = parser.parse_args()
+def eval_best_ensemble(models, config_args, Nensemble, Ntrials, save_dir, validate, test):
+    ens = select_best_ensemble(models, config_args, Nensemble, Ntrials)
+    config = copy.deepcopy(ens.models[0].config)
+    config["algorithm"] = "Ensemble_" + str(Nensemble)
+    version = "_".join([m.config["algorithm"] + "_" + str(m.config["seed"]) for m in ens.models])
 
-# Get the dataset-specific model directory
-model_dir = os.path.join(args.model_dir, args.dataset)
+    print(f"Best ensemble: {version}")
+    m = ClassificationTask(config, ens)
+    evaluate(m, save_dir, validate=validate, test=test, version=version)
 
-## Load the model descriptions
-if args.dataset == "camelyon17":
-    model_descriptions = camelyon17_pretrained_models(model_dir)
-elif args.dataset == "iwildcam":
-    model_descriptions = iwildcam_pretrained_models(model_dir)
-elif args.dataset == "fmow":
-    model_descriptions = fmow_pretrained_models(model_dir)
-elif args.dataset == "rxrx1":
-    model_descriptions = rxrx1_pretrained_models(model_dir)
-else:
-    raise ValueError("Dataset {} not supported".format(args.dataset))
 
-# combine results_dir with dataset name
-save_dir = os.path.join(args.save_dir, args.ensemble_builder, args.dataset)
+def run_ensemble():
+    model_descriptions, config_args, args, save_dir = process_args()
+    config_args["batch_size"] = 32
+    min_ensembles = 4
+    max_ensembles = 5
+    Ntrials = 50
+    Nrepeats = 2
+    for i in range(Nrepeats):
+        print(f"=======> Repeat {i}")
+        for Nensemble in range(min_ensembles, max_ensembles + 1):
+            print(f"=======> Ensemble size {Nensemble}")
+            eval_best_ensemble(model_descriptions, config_args, Nensemble, Ntrials, save_dir, args.validate, args.test)        
+    
+if __name__ == "__main__":
+    run_ensemble()
 
-# build and evalute the ensemebles using the specified approach
-if args.ensemble_builder == "cumulative":
-    best_set, best_score = cumulative_ensemble(model_descriptions, args.algorithm, save_dir, args.eval_size)
-elif args.ensemble_builder == "greedy":
-    best_set, best_score = greedy_ensemble(model_descriptions, args.n_greedy_iterations, args.n_samples, save_dir, args.eval_size)
-elif args.ensemble_builder == "random":
-    best_set, best_score = random_ensemble(model_descriptions, args.n_samples, save_dir, args.eval_size)
-
-print("Best model set:", best_set, " hre: ", best_score)
