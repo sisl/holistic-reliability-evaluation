@@ -23,7 +23,7 @@ devices: 1
 # Training params - (Many of these are likely going to be tuned)
 max_epochs: 10
 lr: 0.001
-batch_size: 1024
+batch_size: 24
 optimizer: adamw
 model: VIT_L_16
 label_smoothing: 0.0

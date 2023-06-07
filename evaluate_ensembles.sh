@@ -1,0 +1,4 @@
+python holistic_reliability_evaluation/evaluate_ensembles.py --validate=False --wilds_pretrained=true --dataset=iwildcam --model_dir=/scratch/users/acorso/wilds_models --save_dir=results/wilds_pretrained
+python holistic_reliability_evaluation/evaluate_ensembles.py --validate=False --wilds_pretrained=true --dataset=fmow --model_dir=/scratch/users/acorso/wilds_models --save_dir=results/wilds_pretrained
+python holistic_reliability_evaluation/evaluate_ensembles.py --validate=False --wilds_pretrained=true --dataset=camelyon17 --model_dir=/scratch/users/acorso/wilds_models --save_dir=results/wilds_pretrained
+python holistic_reliability_evaluation/evaluate_ensembles.py --validate=False --wilds_pretrained=true --dataset=rxrx1 --model_dir=/scratch/users/acorso/wilds_models --save_dir=results/wilds_pretrained

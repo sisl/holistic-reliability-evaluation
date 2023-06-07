@@ -2,6 +2,7 @@ import yaml
 import csv
 import requests
 from collections import namedtuple
+import warnings
 
 import torch
 import torch.nn as nn
@@ -124,16 +125,6 @@ def load_results(results_dir):
         return data
 
 
-# Funtion to recursively flatten a model that has Sequential layers
-def flatten_model(module):
-    layers = []
-    for child in module.children():
-        if isinstance(child, nn.Sequential):
-            layers.extend(flatten_model(child))
-        else:
-            layers.append(child)
-    return layers
-
 # Useful transforms
 # Function to standarize a tensor (0 mean and 1 std)
 def standardize_transform():
@@ -168,9 +159,11 @@ def get_predefined_transforms(transform_strings, config):
         elif transform_name == "random_rotation":
             transforms.append(random_rotation_transform())
         elif transform_name == "randaug":
-            transforms.append(tfs.RandAugment()) #adjust parameters to comply with wilds?
+            transforms.append(tfs.RandAugment()) 
         elif transform_name == "augmix":
-            transforms.append(tfs.AugMix()) #adjust parameters to comply with wilds?
+            transforms.append(tfs.AugMix()) 
+        elif transform_name == "random_horizontal_flip":
+            transforms.append(tfs.RandomHorizontalFlip())
         elif transform_name == "pretrain_default": 
             model = config["model"]
             weights = config["pretrained_weights"]
@@ -187,7 +180,7 @@ def get_predefined_transforms(transform_strings, config):
                 raise ValueError(f"Unknown model source {config['model_source']}")
             transforms.append(tf)
         else:
-            raise ValueError(f"Unknown transform {transform_name}")
+            warnings.warn(f"Unknown transform {transform_name}, skipping")
     
     print("Transforms: ", transforms)
     return tfs.Compose(transforms)

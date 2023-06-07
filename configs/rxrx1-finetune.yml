@@ -9,7 +9,9 @@ n_classes: 1139
 train_dataset: rxrx1-train
 size: [224, 224]
 n_channels: 3
-train_transforms: []
+train_transforms:
+  - random_rotation
+  - random_horizontal_flip
 eval_transforms: [pretrain_default]
 # These are for scaling the performance:
 min_performance: 0.
@@ -21,7 +23,7 @@ accelerator: gpu
 devices: 1
 
 # Training params - (Many of these are likely going to be tuned)
-max_epochs: 5
+max_epochs: 50
 lr: 0.001
 batch_size: 24
 optimizer: adamw
