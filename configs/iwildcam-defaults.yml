@@ -4,12 +4,12 @@ phase: train
 save_folder: /mnt/data/acorso/results/
 
 # Training dataset information
-data_dir: /home/dk11/data/
+data_dir: /scratch/users/acorso/data/
 n_classes: 182
 train_dataset: iwildcam-train
 size: [448, 448]
 n_channels: 3
-train_transforms: [randaug]
+train_transforms: []
 eval_transforms: [wilds_default_normalization]
 # These are for scaling the performance:
 min_performance: 0.
@@ -23,7 +23,7 @@ devices: 1
 # Training params - (Many of these are likely going to be tuned)
 max_epochs: 12
 lr: 0.001
-batch_size: 1
+batch_size: 24
 optimizer: adam
 model_source: torchvision
 model: resnet50
