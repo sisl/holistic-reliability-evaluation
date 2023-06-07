@@ -1,0 +1,27 @@
+program: /home/users/dk11/holistic-reliability-evaluation/holistic_reliability_evaluation/train.py
+method: random
+
+metric:
+  name: val_performance
+  goal: maximize
+
+parameters:
+  phase:
+    values: [train]
+  label_smoothing:
+    values: [0.1, 0.01, 0.0]
+  optimizer:
+    values: [adam, sgd, rmsprop, adagrad, adamw]
+  lr:
+    distribution: log_uniform_values
+    min: 1e-4
+    max: 1e-2
+
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - --config
+  - /home/users/dk11/holistic-reliability-evaluation/configs/camelyon17-augmix.yml
+  - --phase
+  - train
