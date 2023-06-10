@@ -53,7 +53,7 @@ def evaluate(
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    # Name of the wilds datset to evaluate
+    # Name of the wilds datset to evaluate (e.g. "camelyon17", "iwildcam", "fmow")
     parser.add_argument("--dataset")
     
     # Set if we are using the wilds pretrained models, if self-trained use false
@@ -68,22 +68,22 @@ def parse_args():
     # Directory where the results should be stored
     parser.add_argument("--save_dir")
     
-    # Whether or not to use inference mode
+    # Whether or not to use inference mode (which is faster but disables adversarial robustness and ODIN evaluations)
     parser.add_argument("--inference_mode", type=bool, default=False)
     
     # Number of samples to evaluate on
     parser.add_argument("--eval_size", type=int, default=1024)
     
-    # Set the calibration method to use
+    # Set the calibration method to use, options include "none" and "temperature_scaling"
     parser.add_argument("--calibration_method", default="none")
     
     # Set the data directory (it might have been set by someone else in the config we load)
     parser.add_argument("--data_dir", default="/scratch/users/acorso/data/")
     
-    # Decide whether or not to validate the model
+    # Decide whether or not to validate the model (i.e. use the validation set)
     parser.add_argument("--validate", type=bool, default=True)
     
-    # Decide whether or not to test the model
+    # Decide whether or not to test the model (i.e. use the test set)
     parser.add_argument("--test", type=bool, default=True)
     
     return parser.parse_args()

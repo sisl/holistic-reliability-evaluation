@@ -140,11 +140,11 @@ def eval_best_ensemble(models, config_args, Nensemble, Ntrials, save_dir, valida
 
 def run_ensemble():
     model_descriptions, config_args, args, save_dir = process_args()
-    config_args["batch_size"] = 32
-    min_ensembles = 4
-    max_ensembles = 5
-    Ntrials = 50
-    Nrepeats = 2
+    config_args["batch_size"] = 32 # Batch size (we are taking gradients with all models, so this sometimes need to be reduced)
+    min_ensembles = 1 # Minimum number of models in the ensemble
+    max_ensembles = 5 # Maximum number of models in the ensemble
+    Ntrials = 50 # Number of ensembles to contruct and measure id-val performance
+    Nrepeats = 3 # Number of times to repeat the full experiment
     for i in range(Nrepeats):
         print(f"=======> Repeat {i}")
         for Nensemble in range(min_ensembles, max_ensembles + 1):
