@@ -1,28 +1,29 @@
 #!/usr/bin/env sh
 
-DEFAULT_CONFIG='iwildcam-defaults.yml'
+DEFAULT_CONFIG='iwildcam-finetune.yml'
 MODEL_SOURCES=('torchvision' 'open_clip' 'mae')
-TMPD="tmp2"
-YQ_TMP=$(mktemp)
 
-for iter in {1..1}; do
+STASH_DIR="configs/.config_stash/model_sources_sweep"
+mkdir -p $STASH_DIR
+
+./configs/bin/yq ".save_folder =       env(SCRATCH)/holistic-reliability-evaluation/results |
+                  .data_dir    = env(GROUP_SCRATCH)/holistic-reliability-evaluation/data |
+                  .max_num_workers = 16 |
+                  .batch_size = .batch_size / 2 | .batch_size tag=!!int |
+                  .adversarial_training_method = FGSM |
+                  .adversarial_training_eps = 3/255 |
+                  .eval_transforms = [wilds_default_normalization]" configs/$DEFAULT_CONFIG\
+        > $STASH_DIR/adversarial-config-base.yml
+
+
+for seed in {1..2}; do  # the seed is passed to the `submit_config` script, which passes it to pytorch-lightning
     for MODEL_SOURCE in "${MODEL_SOURCES[@]}"; do
-        YQ_IN=".save_folder = \"/scratch/users/romeov/holistic-reliability-evaluation/results\" |
-               .data_dir = \"/scratch/users/romeov/holistic-reliability-evaluation/data\" |
-               .max_num_workers = 16 |
-               .batch_size = .batch_size / 2 | .batch_size tag=\"!!int\" |
-               .adversarial_training_method = \"FGSM\" |
-               .adversarial_training_eps = \"3/255\" |
-               .eval_transforms = [\"wilds_default_normalization\"] |
-               .algorithm = \"model_sweep_adversarial\" |
-               .model_source = \"${MODEL_SOURCE}\""
-        echo $YQ_IN > $YQ_TMP
-        ./configs/bin/yq --from-file $YQ_TMP configs/$DEFAULT_CONFIG > $TMPD/$DEFAULT_CONFIG
-        # sbatch submit_config.sh $TMPD/$DEFAULT_CONFIG
-
-        # ./configs/bin/yq e '.adversarial_training_eps = "1/255"' $TMPD/$DEFAULT_CONFIG > $TMPD/${DEFAULT_CONFIG%.*}_${MODEL_SOURCE}_1.$iter.yml
-        # sbatch submit_config.sh $TMPD/${DEFAULT_CONFIG%.*}_1.$iter.yml $iter
-        # ./configs/bin/yq e '.adversarial_training_eps = "8/255"' $TMPD/$DEFAULT_CONFIG > $TMPD/${DEFAULT_CONFIG%.*}_${MODEL_SOURCE}_2.$iter.yml
-        # sbatch submit_config.sh $TMPD/${DEFAULT_CONFIG%.*}_2.$iter.yml $iter
+        # we export these variables for use in yq
+        export ALGO_NAME="adversarial_training_ViT-model_source_${MODEL_SOURCE}"
+        export MODEL_SOURCE
+        ./configs/bin/yq  ".algorithm    = env(ALGO_NAME) |
+                           .model_source = env(MODEL_SOURCE)" $STASH_DIR/adversarial-config-base.yml \
+                > $STASH_DIR/adversarial-config--model-source=${MODEL_SOURCE}.yml
+        sbatch configs/submit_adv_config.sh $STASH_DIR/adversarial-config--model-source=${MODEL_SOURCE}.yml $seed
     done
 done
