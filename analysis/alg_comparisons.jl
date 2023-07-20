@@ -5,8 +5,8 @@ pszw = 400
 pszh = 350
 
 #region: Intialize some important names and defaults
-datasets = ["iwildcam", "fmow", "camelyon17"]#, "rxrx1"]
-dataset_names = ["iWildCam", "FMoW", "Camelyon17"]#, "RxRx1"]
+datasets = ["iwildcam", "fmow", "camelyon17"]
+dataset_names = ["iWildCam", "FMoW", "Camelyon17"]
 
 performance_metrics(prefix="test") = ["$(prefix)_performance", "$(prefix)_robustness", "$(prefix)_security", "$(prefix)_calibration", "$(prefix)_ood_detection", "$(prefix)_hre_score"]
 performance_metric_names = ["ID Performance", "DS Robustness", "Adv Robustness", "Calibration", "OOD Detection", "HR score"]
@@ -33,6 +33,59 @@ function comparison_all_datasets(x, y, xlabel, ylabel, c; lb=0, ub=1, title="", 
         scatter!(p,xi,yi, markercolor=di, label=dname, alpha=0.3, markerstrokealpha=0)
     end
     p
+end
+
+# Various groupings of models
+baseline_names = Dict("iwildcam"=>["erm", "erm-v2"], "fmow" => ["erm", "erm-v2"], "camelyon17" => ["erm", "erm-v2"])
+
+data_augs_names_base = ["erm-augment", "augmix"]
+data_augs_names = Dict("iwildcam"=>["randaug", data_augs_names_base...], "fmow" => ["randaug", data_augs_names_base...], "camelyon17" => data_augs_names_base)
+
+adversarial_train_names = Dict("iwildcam"=>["adversarial_sweep"], "fmow" => ["adversarial_sweep"], "camelyon17" => ["adversarial_sweep"])
+
+ensembles_names_base = ["Ensemble_1", "Ensemble_2", "Ensemble_3", "Ensemble_4", "Ensemble_5"]
+ensemble_names = Dict("iwildcam"=>ensembles_names_base, "fmow" => ensembles_names_base, "camelyon17" => ensembles_names_base)
+
+finetuned_names_base = [
+    "open_clip_vit_b_16_openai", 
+    "open_clip_vit_h_14_laion2b_s32b_b79k", 
+    "open_clip_vit_l_14_openai", 
+    "torchvision_convnext_large_IMAGENET1K_V1", 
+    "torchvision_efficientnet_v2_l_IMAGENET1K_V1", 
+    "torchvision_maxvit_t_IMAGENET1K_V1", 
+    "torchvision_swin_v2_b_IMAGENET1K_V1", 
+    "torchvision_vit_b_16_IMAGENET1K_SWAG_LINEAR_V1", 
+    "torchvision_vit_b_16_IMAGENET1K_V1", 
+    "torchvision_vit_h_14_IMAGENET1K_SWAG_LINEAR_V1", 
+    "torchvision_vit_l_16_IMAGENET1K_SWAG_LINEAR_V1", 
+    "torchvision_vit_l_16_IMAGENET1K_V1",
+    "mae_vit_b_16_DEFAULT", 
+    "mae_vit_h_14_DEFAULT", 
+    "mae_vit_l_16_DEFAULT"
+    ]
+finetuned_names = Dict("iwildcam"=>finetuned_names_base,"fmow" => finetuned_names_base,"camelyon17" => finetuned_names_base)
+
+
+lossfns_base = ["irm", "deepCORAL", "groupDRO"]
+lossfns_names = Dict("iwildcam"=>lossfns_base, "fmow" => lossfns_base, "camelyon17" => lossfns_base)
+
+unlabeled_base = ["deepCORAL-Coarse", "AFN", "DANN", "PseudoLabels", "FixMatch", "SwAV"] 
+unlabeled_iwildcam_names = [unlabeled_base..., "NoisyStudent-extraunlabeled"]
+unlabeled_fmow_names = [unlabeled_base..., "NoisyStudent-trainunlabeled", "NoisyStudent-testunlabeled", "NoisyStudent-valunlabeled"]
+unlabeled_camelyon17_names = [unlabeled_base..., "NoisyStudent-trainunlabeled", "NoisyStudent-testunlabeled", "NoisyStudent-valunlabeled"]
+unlabeled_names = Dict("iwildcam"=>unlabeled_iwildcam_names,"fmow" => unlabeled_fmow_names,"camelyon17" => unlabeled_camelyon17_names)
+
+groups = [baseline_names, data_augs_names, adversarial_train_names, ensemble_names, finetuned_names, lossfns_names, unlabeled_names]
+group_names = ["Baseline", "Data Aug.", "Adv. Training", "Ensemble", "Fine-tuned", "Loss Function", "Unlabeled Data"]
+
+function merge_groups(groups...)
+    gret = deepcopy(groups[1])
+    for g in groups[2:end]
+        for (d, names) in g
+            gret[d] = vcat(gret[d], names)
+        end
+    end
+    gret
 end
 #endregion
 
@@ -148,28 +201,28 @@ end
 wi = self_vs_wilds .== :wilds
 
 # Plot the performance drop/accuracy on the line for the wilds only models. This motivates the need for domain shifted datasets
-p1 = comparison_all_datasets(all_id_acc[wi], all_val_acc[wi], "ID Accuracy", "Val Accuracy", dataset_indices[wi], legend=:topleft)
-p2 = comparison_all_datasets(all_id_acc[wi], all_test_acc[wi], "ID Accuracy", "Test Accuracy", dataset_indices[wi], legend=false)
-p3 = comparison_all_datasets(all_id_acc[wi], all_synth_acc[wi], "ID Accuracy", "C1 Accuracy", dataset_indices[wi], legend=false)
+p1 = comparison_all_datasets(all_id_acc[wi], all_val_acc[wi], "ID Accuracy", "Val DS Accuracy", dataset_indices[wi], legend=:topleft)
+p2 = comparison_all_datasets(all_id_acc[wi], all_test_acc[wi], "ID Accuracy", "Test DS Accuracy", dataset_indices[wi], legend=false)
+p3 = comparison_all_datasets(all_id_acc[wi], all_synth_acc[wi], "ID Accuracy", "C1 DS Accuracy", dataset_indices[wi], legend=false)
 plot(p1, p2, p3, layout=(1,3), size=(pszw*3, pszh))
 savefig("analysis/paper_figures/performance_drop.pdf")
 
 # Plot the performance comparison between the different shifted datasets - Shows that one does not predict the other necessarily
-p1 = comparison_all_datasets(all_val_acc[wi], all_test_acc[wi], "Val Accuracy", "Test Accuracy", dataset_indices[wi], legend=:topleft)
-p2 = comparison_all_datasets(all_synth_acc[wi], all_test_acc[wi], "C1 Accuracy", "Test Accuracy", dataset_indices[wi], legend=false)
+p1 = comparison_all_datasets(all_val_acc[wi], all_test_acc[wi], "Val DS Accuracy", "Test DS Accuracy", dataset_indices[wi], legend=:topleft)
+p2 = comparison_all_datasets(all_synth_acc[wi], all_test_acc[wi], "C1 DS Accuracy", "Test DS Accuracy", dataset_indices[wi], legend=false)
 plot(p1, p2, layout=(1,2), size=(pszw*2, pszh))
 savefig("analysis/paper_figures/ds_performance_comparisons.pdf")
 
 
 # Plot calibration drops
-p1 = comparison_all_datasets(all_id_cal[wi], all_val_cal[wi], "ID Calibration", "Val Calibration", dataset_indices[wi], legend=:topleft)
-p2 = comparison_all_datasets(all_id_cal[wi], all_test_cal[wi], "ID Calibration", "Test Calibration", dataset_indices[wi], legend=false)
-p3 = comparison_all_datasets(all_id_cal[wi], all_synth_cal[wi], "ID Calibration", "C1 Calibration", dataset_indices[wi], legend=false)
+p1 = comparison_all_datasets(all_id_cal[wi], all_val_cal[wi], "ID Calibration", "Val DS Calibration", dataset_indices[wi], legend=:topleft)
+p2 = comparison_all_datasets(all_id_cal[wi], all_test_cal[wi], "ID Calibration", "Test DS Calibration", dataset_indices[wi], legend=false)
+p3 = comparison_all_datasets(all_id_cal[wi], all_synth_cal[wi], "ID Calibration", "C1 DS Calibration", dataset_indices[wi], legend=false)
 plot(p1, p2, p3, layout=(1,3), size=(pszw*3, pszh))
 savefig("analysis/paper_figures/calibration_drop.pdf")
 
-p1 = comparison_all_datasets(all_val_cal[wi], all_test_cal[wi], "Val Calibration", "Test Calibration", dataset_indices[wi], legend=:topleft)
-p2 = comparison_all_datasets(all_synth_cal[wi], all_test_cal[wi], "C1 Calibration", "Test Calibration", dataset_indices[wi], legend=false)
+p1 = comparison_all_datasets(all_val_cal[wi], all_test_cal[wi], "Val DS Calibration", "Test DS Calibration", dataset_indices[wi], legend=:topleft)
+p2 = comparison_all_datasets(all_synth_cal[wi], all_test_cal[wi], "C1 DS Calibration", "Test DS Calibration", dataset_indices[wi], legend=false)
 plot(p1, p2, layout=(1,2), size=(pszw*2, pszh))
 savefig("analysis/paper_figures/ds_calibration_comparisons.pdf")
 
@@ -240,94 +293,184 @@ savefig("analysis/paper_figures/ood_detection_scatter.pdf")
 
 #endregion
 
+#region: Histograms of metrics
+
+for d in datasets
+    perf = []
+    groupid = []
+    ds_rob = []
+    adv_rob = []
+    cal = []
+    ood = []
+    hr = []
+    for (group_name, group) in zip(reverse(group_names), reverse(groups))
+        models = group[d]
+        vec = vcat([get_perf(results[d], "test_performance", c) for c in models]...)
+        groupid = vcat(groupid..., fill(group_name, length(vec))...)
+        perf = vcat(perf..., vec...)
+        ds_rob = vcat(ds_rob..., [get_perf(results[d], "test_robustness", c) for c in models]...)
+        adv_rob = vcat(adv_rob..., [get_perf(results[d], "test_security", c) for c in models]...)
+        cal = vcat(cal..., [get_perf(results[d], "test_calibration", c) for c in models]...)
+        ood = vcat(ood..., [get_perf(results[d], "test_ood_detection", c) for c in models]...)
+        hr = vcat(hr..., [get_perf(results[d], "test_hre_score", c) for c in models]...)
+    end
+    p1 = groupedhist(perf, group=groupid, legend=false, ylabel="Count",xlabel="ID Performance", bar_position=:stack, palette=:seaborn_deep, xticks=0:0.2:1.0, nbins=10, linewidth=1)
+    p2 = groupedhist(ds_rob, group=groupid, legend=false, xlabel="DS Robustness", bar_position=:stack, palette=:seaborn_deep, xticks=0:0.2:1.0,nbins=10, linewidth=1)
+    p3 = groupedhist(adv_rob, group=groupid, legend=false, xlabel="Adv Robustness", bar_position=:stack, palette=:seaborn_deep, xticks=0:0.2:1.0, nbins=10, linewidth=1)
+    p4 = groupedhist(cal, group=groupid, legend=false, xlabel="Calibration", bar_position=:stack, palette=:seaborn_deep, xticks=0:0.3:1.0, nbins=10, linewidth=1)
+    p5 = groupedhist(ood, group=groupid, legend=false, xlabel="OOD Detection", bar_position=:stack, palette=:seaborn_deep, xticks=0:0.1:1.0, nbins=10, linewidth=1)
+    p6 = groupedhist(hr, group=groupid, legend=:outertopright, xlabel="HR Score", bar_position=:stack, palette=:seaborn_deep, xticks=0:0.1:1.0, nbins=10, linewidth=1)
+
+    plot(p1, p2, p3, p4, p5, p6, layout=(1,6), size=(800, 170), left_margin=-8mm, tickfontsize=18, legendfontsize=12)
+    savefig("analysis/paper_figures/distribution_of_scores_$d.pdf")
+end
+
+#endregion
+
+#region Bar chart of HR score improvements
+
+all_hr_improvements = []
+new_group_names = String[]
+for (datasetname, d) in zip(dataset_names, datasets) 
+    perf = []
+    groupid = []
+    ds_rob = []
+    adv_rob = []
+    cal = []
+    ood = []
+    hr = []
+    for (group_name, group) in zip(reverse(group_names), reverse(groups))
+        models = group[d]
+        vec = vcat([get_perf(results[d], "test_performance", c) for c in models]...)
+        groupid = vcat(groupid..., fill(group_name, length(vec))...)
+        perf = vcat(perf..., vec...)
+        ds_rob = vcat(ds_rob..., [get_perf(results[d], "test_robustness", c) for c in models]...)
+        adv_rob = vcat(adv_rob..., [get_perf(results[d], "test_security", c) for c in models]...)
+        cal = vcat(cal..., [get_perf(results[d], "test_calibration", c) for c in models]...)
+        ood = vcat(ood..., [get_perf(results[d], "test_ood_detection", c) for c in models]...)
+        hr = vcat(hr..., [get_perf(results[d], "test_hre_score", c) for c in models]...)
+    end
+
+
+    hr_baseline = hr[groupid .== "Baseline"]
+
+    new_group_names = String[]
+    hr_improvements = []
+    for (group_name, group) in zip(group_names, groups)
+        if group_name == "Baseline"
+            continue
+        end
+        hr_group = hr[groupid .== group_name]
+        hr_improvement = maximum(hr_group) .- maximum(hr_baseline)
+        push!(new_group_names, group_name)
+        push!(hr_improvements, hr_improvement)
+    end
+    push!(all_hr_improvements, hr_improvements)
+end
+
+new_group_names
+push!(all_hr_improvements, mean(all_hr_improvements))
+
+plots = []
+for (i, (datasetname, hr_improvements)) in enumerate(zip([dataset_names..., "Average"], all_hr_improvements))
+    p = bar(new_group_names, hr_improvements, legend=false, ylabel= i==1 ? "HR Score Improvement" : "", xrotation=45, title=datasetname)
+    # xticks!(0.1:1:length(hr_improvements)-0.5, new_group_names)
+    push!(plots, p)
+end
+plot(plots..., layout=(1,4), size=(1600, 300))
+savefig("analysis/paper_figures/hr_score_max_improvements.pdf")
+#endregion
+
 #region: Relationship between metrics
+
+## This plots the adjust metric correlations
 plots = []
 for (d, dname) in zip(datasets, dataset_names)
-    perf = vcat([get_perf(results[d], "test_performance", c) for c in keys(results[d])]...)
-    ds_perf = vcat([get_perf(results[d], "test_ds_performance", c) for c in keys(results[d])]...)
-    ds_rob = vcat([get_perf(results[d], "test_robustness", c) for c in keys(results[d])]...)
-    adv_rob = vcat([get_perf(results[d], "test_security", c) for c in keys(results[d])]...)
-    cal = vcat([get_perf(results[d], "test_calibration", c) for c in keys(results[d])]...)
-    ood = vcat([get_perf(results[d], "test_ood_detection", c) for c in keys(results[d])]...)
-    
-    p = plot_correlations([perf, ds_rob, adv_rob, cal, ood], ["ID Performance", "DS Robustness", "Adv Robustness", "Calibration", "OOD Detection"], title=dname, annotate_rval=true, colorbar=d==datasets[end], ylabels=d==datasets[1])
+    perf = []
+    groupid = []
+    ds_rob = []
+    adv_rob = []
+    cal = []
+    ood = []
+    hr = []
+    for (group_name, group) in zip(reverse(group_names), reverse(groups))
+        models = group[d]
+        vec = vcat([get_perf(results[d], "test_performance", c) for c in models]...)
+        groupid = vcat(groupid..., fill(group_name, length(vec))...)
+        perf = vcat(perf..., vec...)
+        ds_rob = vcat(ds_rob..., [get_perf(results[d], "test_robustness", c) for c in models]...)
+        adv_rob = vcat(adv_rob..., [get_perf(results[d], "test_security", c) for c in models]...)
+        cal = vcat(cal..., [get_perf(results[d], "test_calibration", c) for c in models]...)
+        ood = vcat(ood..., [get_perf(results[d], "test_ood_detection", c) for c in models]...)
+        hr = vcat(hr..., [get_perf(results[d], "test_hre_score", c) for c in models]...)
+    end
+    p = plot_correlations([perf, ds_rob, adv_rob, cal, ood], ["ID Performance", "DS Robustness", "Adv Robustness", "Calibration", "OOD Detection"], groups=groupid, title=dname, annotate_rval=true, colorbar=d==datasets[end], ylabels=d==datasets[1])
     push!(plots, p)
 end
 plot(plots..., layout=grid(1, 3, widths=[0.333, 0.333, 0.333]), size=(pszw*2.8, pszh))
-savefig("analysis/paper_figures/metric_correlations.pdf")
+savefig("analysis/paper_figures/metric_correlations_adjusted.pdf")
 
-# Adversarial Robustness vs. ID Perf
-plots = []
-legends = [:topright, :topright, :bottomleft]
-for (d, dname, legend) in zip(datasets, dataset_names, legends)
-    perf = vcat([get_perf(results[d], "test_performance", c) for c in keys(results[d])]...)
-    adv = vcat([get_perf(results[d], "test_security", c) for c in keys(results[d])]...)
-    p = scatter_fit(perf, adv, p=plot(xlabel="ID Performance", ylabel="Adv Robustness", title=dname; legend))
-    push!(plots, p)
+
+function make_correlation_plot(results, model_names, save_name)
+    plots = []
+    for (d, dname) in zip(datasets, dataset_names)
+        if model_names == :all
+            models = keys(results[d])
+        else
+            models = model_names[d]
+        end
+        perf = vcat([get_perf(results[d], "test_performance", c) for c in models]...)
+        ds_perf = vcat([get_perf(results[d], "test_ds_performance", c) for c in models]...)
+        ds_rob = vcat([get_perf(results[d], "test_robustness", c) for c in models]...)
+        adv_rob = vcat([get_perf(results[d], "test_security", c) for c in models]...)
+        cal = vcat([get_perf(results[d], "test_calibration", c) for c in models]...)
+        ood = vcat([get_perf(results[d], "test_ood_detection", c) for c in models]...)
+        
+        p = plot_correlations([perf, ds_rob, adv_rob, cal, ood], ["ID Performance", "DS Robustness", "Adv Robustness", "Calibration", "OOD Detection"], title=dname, annotate_rval=true, colorbar=d==datasets[end], ylabels=d==datasets[1])
+        push!(plots, p)
+    end
+    plot(plots..., layout=grid(1, 3, widths=[0.333, 0.333, 0.333]), size=(pszw*2.8, pszh))
+    savefig("analysis/paper_figures/$save_name.pdf")
 end
-plot(plots..., layout = (1, 3), size=(pszw*3, pszh))
-savefig("analysis/paper_figures/adv_robustness_vs_id_perf.pdf")
 
-# Adversarial Performance vs. ID Perf
-plots = []
-legends = [:topright, :topleft, :bottomleft]
-for (d, dname, legend) in zip(datasets, dataset_names, legends)
-    perf = vcat([get_perf(results[d], "test_performance", c) for c in keys(results[d])]...)
-    adv = vcat([get_perf(results[d], "test_security", c) for c in keys(results[d])]...)
-    p = scatter_fit(perf, adv.*perf, p=plot(xlabel="ID Performance", ylabel="Adv Performance", title=dname; legend))
-    push!(plots, p)
+function make_scatter(results, model_names, xsym, ysym, xname, yname, savefile, legends = [:topright, :topright, :bottomleft])
+    plots = []
+    for (d, dname, legend) in zip(datasets, dataset_names, legends)
+        if model_names == :all
+            models = keys(results[d])
+        else
+            models = model_names[d]
+        end
+        xvals = vcat([get_perf(results[d], xsym, c) for c in models]...)
+        yvals = vcat([get_perf(results[d], ysym, c) for c in models]...)
+        p = scatter_fit(xvals, yvals, p=plot(xlabel=xname, ylabel=yname, title=dname; legend))
+        push!(plots, p)
+    end
+    plot(plots..., layout = (1, 3), size=(pszw*3, pszh))
+    savefig("analysis/paper_figures/$savefile.pdf")
 end
-plot(plots..., layout = (1, 3), size=(pszw*3, pszh))
-savefig("analysis/paper_figures/adv_performance_vs_id_perf.pdf")
 
-# Calibration vs. ID Performance
-plots = []
-legends  = [:bottomright, :bottomright, :topleft]
-for (d, dname, legend) in zip(datasets, dataset_names, legends)
-    perf = vcat([get_perf(results[d], "test_performance", c) for c in keys(results[d])]...)
-    cal = vcat([get_perf(results[d], "test_calibration", c) for c in keys(results[d])]...)
-    p = scatter_fit(perf, cal, p=plot(xlabel="ID Performance", ylabel="Calibration", title=dname; legend))
-    push!(plots, p)
-end
-plot(plots..., layout = (1, 3), size=(pszw*3, pszh))
-savefig("analysis/paper_figures/calibration_vs_id_perf.pdf")
-
-# DS Robustness vs Calibration
-plots = []
-legends  = [:bottomright, :bottomright, :topleft]
-for (d, dname, legend) in zip(datasets, dataset_names, legends)
-    ds_rob = vcat([get_perf(results[d], "test_robustness", c) for c in keys(results[d])]...)
-    cal = vcat([get_perf(results[d], "test_calibration", c) for c in keys(results[d])]...)
-    p = scatter_fit(ds_rob, cal, p=plot(xlabel="DS Robustness", ylabel="Calibration", title=dname; legend))
-    push!(plots, p)
-end
-plot(plots..., layout = (1, 3), size=(pszw*3, pszh))
-savefig("analysis/paper_figures/cal_vs_ds_robustness.pdf")
-
-# DS Robustness vs ID Performance
-plots = []
-legends  = [:bottomright, :bottomright, :bottomleft]
-for (d, dname, legend) in zip(datasets, dataset_names, legends)
-    perf = vcat([get_perf(results[d], "test_performance", c) for c in keys(results[d])]...)
-    ds_rob = vcat([get_perf(results[d], "test_robustness", c) for c in keys(results[d])]...)
-    p = scatter_fit(perf, ds_rob, p=plot(xlabel="ID Performance", ylabel="DS Robustness", title=dname; legend))
-    push!(plots, p)
-end
-plot(plots..., layout = (1, 3), size=(pszw*3, pszh))
-savefig("analysis/paper_figures/ds_robustness_vs_id_perf.pdf")
+make_correlation_plot(results, finetuned_names, "metric_correlations_finetuned")
+make_scatter(results, finetuned_names, "test_robustness", "test_calibration", "DS Robustness", "Calibration", "calibration_vs_ds_robustness_finetune", [:topleft, :topleft, :topleft])
 
 
-# OOD Detection vs ID Performance
-plots = []
-legends  = [:topleft, :topleft, :topleft]
-for (d, dname, legend) in zip(datasets, dataset_names, legends)
-    perf = vcat([get_perf(results[d], "test_performance", c) for c in keys(results[d])]...)
-    ood = vcat([get_perf(results[d], "test_ood_detection", c) for c in keys(results[d])]...)
-    p = scatter_fit(perf, ood, p=plot(xlabel="ID Performance", ylabel="OOD Detection", title=dname; legend))
-    push!(plots, p)
-end
-plot(plots..., layout = (1, 3), size=(pszw*3, pszh))
-savefig("analysis/paper_figures/ood_detection_vs_id_perf.pdf")
+# # Adversarial Robustness vs. ID Perf
+# make_scatter(results, :all, "test_performance", "test_security", "ID Performance", "Adv Robustness", "adv_robustness_vs_id_perf", [:topright, :topright, :bottomleft])
+
+# # Adversarial Performance vs. ID Perf
+# make_scatter(results, :all, "test_performance", "test_security", "ID Performance", "Adv Performance", "adv_performance_vs_id_perf", [:topright, :topleft, :bottomleft])
+
+# # Calibration vs. ID Performance
+# make_scatter(results, :all, "test_performance", "test_calibration", "ID Performance", "Calibration", "calibration_vs_id_perf", [:bottomright, :bottomright, :topleft])
+
+# # Calibration vs. DS Robustness
+# make_scatter(results, :all, "test_robustness", "test_calibration", "DS Robustness", "Calibration", "calibration_vs_ds_robustness", [:bottomright, :bottomright, :topleft])
+
+# # DS Robustness vs ID Performance
+# make_scatter(results, :all, "test_performance", "test_robustness", "ID Performance", "DS Robustness", "ds_robustness_vs_id_perf", [:bottomright, :bottomright, :bottomleft])
+
+# # OOD Detection vs ID Performance
+# make_scatter(results, :all, "test_performance", "test_ood_detection", "ID Performance", "OOD Detection", "ood_detection_vs_id_perf", [:topleft, :topleft, :topleft])
 
 #endregion
 
@@ -424,7 +567,7 @@ maxvit_t = ["torchvision_maxvit_t_IMAGENET1K_V1"]
 swin_v2 = ["torchvision_swin_v2_b_IMAGENET1K_V1"]
 vit_b = ["torchvision_vit_b_16_IMAGENET1K_V1"]
 vit_l = ["torchvision_vit_l_16_IMAGENET1K_V1"]
-comparison_algs = OrderedDict("ConvNext" => convnext,
+comparison_algs = OrderedDict("ConvNeXt" => convnext,
                               "\\phantom{iii}EfficientNet" => efficientnet,
                                 "MaxViT" => maxvit_t,
                                 "SWIN-V2" => swin_v2,
@@ -442,7 +585,7 @@ vit_b = ["mae_vit_b_16_DEFAULT", "torchvision_vit_b_16_IMAGENET1K_SWAG_LINEAR_V1
 vit_l = ["torchvision_vit_l_16_IMAGENET1K_V1", "torchvision_vit_l_16_IMAGENET1K_SWAG_LINEAR_V1", "open_clip_vit_l_14_openai", "mae_vit_l_16_DEFAULT"]
 vit_h = ["open_clip_vit_h_14_laion2b_s32b_b79k", "mae_vit_h_14_DEFAULT", "torchvision_vit_h_14_IMAGENET1K_SWAG_LINEAR_V1"]
 comparison_algs = OrderedDict(
-                              "\\phantom{iiiiiiiiip}ViT-H" => vit_b,
+                              "\\phantom{iiiiiiiiip}ViT-B" => vit_b,
                               "ViT-L" => vit_l,
                               "ViT-H" => vit_h)
 
@@ -490,20 +633,19 @@ for (di, dataset) in enumerate(datasets)
     # Loop through the intersection of keys of results and results_calibrated
     for key in intersect(keys(results[dataset]), keys(results_calibrated[dataset]))
         for version in intersect(keys(results[dataset][key]), keys(results_calibrated[dataset][key]))
-            println("key:", key, "version: ", version)
             # Get the scores
             try
                 calibration_uncalibrated =  get_perf(results[dataset], "test_calibration", key, version=version)
                 calibration_calibrated = get_perf(results_calibrated[dataset], "test_calibration", key, version=version)
 
-                if calibration_calibrated <= calibration_uncalibrated
-                    println("==========> Weird circumstance for key: ", key, " version: ", version)
-                end
                 ood_uncalibrated = get_perf(results[dataset], "test_ood_detection", key, version=version)
                 ood_calibrated = get_perf(results_calibrated[dataset], "test_ood_detection", key, version=version)
                 adv_uncalibrated = get_perf(results[dataset], "test_security", key, version=version)
                 adv_calibrated = get_perf(results_calibrated[dataset], "test_security", key, version=version)
 
+                if any(isnothing.([calibration_uncalibrated, calibration_calibrated, ood_uncalibrated, ood_calibrated, adv_uncalibrated, adv_calibrated]))
+                    continue
+                end
                 push!(cal_scores_uncalibrated, calibration_uncalibrated)
                 push!(cal_scores_calibrated, calibration_calibrated)
                 push!(ood_scores_uncalibrated, ood_uncalibrated)
@@ -512,6 +654,7 @@ for (di, dataset) in enumerate(datasets)
                 push!(adv_scores_calibrated, adv_calibrated)
                 push!(dataset_indices, di)
             catch
+                println("length(cal_scores): ", length(cal_scores_uncalibrated), " length(cal_scores_calibrated): ", length(cal_scores_calibrated))
                 println("Skipping key: ", key, " version: ", version)
             end
         end
@@ -609,3 +752,104 @@ savefig("analysis/paper_figures/temperature_scaling.pdf")
 # savefig("analysis/paper_figures/model_selection.png")
 
 #endregion
+
+
+### This is all for the AI Safety Summer course
+# performance_metrics(prefix="test") = ["$(prefix)_robustness", "$(prefix)_security"]
+# performance_metric_names = ["DS Robustness", "Adv Robustness"]
+# ranges = [(0.6,1.0), (0,0.75)]
+
+# function hre_plot(results, comparison_algs, prefix="test")
+#     plots = []
+#     for (i, (metric, mectric_name, range)) in enumerate(zip(performance_metrics(prefix), performance_metric_names, ranges))
+#         p = single_metric_comp(results, metric, mectric_name, baseline_algs, comparison_algs, ytick_label=i==1, left_margin=-8mm, tickfontsize=18)
+#         plot!(xlims=range)
+
+#         push!(plots, p)
+#     end
+#     plot(plots..., layout=(1,6), size=(800,100 + 25*length(comparison_algs)),)
+# end
+
+# no_data_augs = ["no_data_augs"]
+# randaug = ["erm-augment", "randaug"]
+# augmix = ["augmix"]
+# adv = ["adversarial_sweep"]
+# comparison_algs = OrderedDict("RandAug" => randaug,
+#                               "AugMix" => augmix,
+#                             #   "None" => no_data_augs,
+#                               "\\phantom{iir}Adversarial" => adv)
+
+# randaug = ["erm-augment"]                  
+# comparison_algs_c17 = OrderedDict("RandAug" => randaug,
+#                               "AugMix" => augmix,
+#                               #   "None" => no_data_augs,\
+#                               "\\phantom{iir}Adversarial" => adv)
+
+# for d in datasets
+#     if d == "camelyon17"
+#         hre_plot(results[d], comparison_algs_c17)
+#         savefig("analysis/FOR CLASS/dataset_augmentation_$d.pdf")
+#     else
+#         hre_plot(results[d], comparison_algs)
+#         savefig("analysis/FOR CLASS/dataset_augmentation_$d.pdf")
+#     end
+# end
+
+
+
+# performance_metrics(prefix="test") = ["$(prefix)_robustness"]
+# performance_metric_names = ["DS Robustness"]
+# ranges = [(0.6,1.0)]
+
+# function hre_plot(results, comparison_algs, prefix="test")
+#     plots = []
+#     for (i, (metric, mectric_name, range)) in enumerate(zip(performance_metrics(prefix), performance_metric_names, ranges))
+#         p = single_metric_comp(results, metric, mectric_name, baseline_algs, comparison_algs, ytick_label=i==1, left_margin=-8mm, tickfontsize=18)
+#         plot!(xlims=range)
+
+#         push!(plots, p)
+#     end
+#     plot(plots..., layout=(1,length(plots)), size=(200,100 + 25*length(comparison_algs)),)
+# end
+# irm = ["irm"]
+# coral = ["deepCORAL"]
+# dro = ["groupDRO"]
+# comparison_algs = OrderedDict("IRM" => irm,
+#                               "CORAL" => coral,
+#                               "\\phantom{tp}GroupDRO" => dro)
+
+# for d in datasets
+#     hre_plot(results[d], comparison_algs)
+#     savefig("analysis/FOR CLASS/invariant_loss_$d.pdf")
+# end
+
+
+# comparison_algs = OrderedDict(
+#                               "2 Models" => ["Ensemble_2"],
+#                               "3 Models" => ["Ensemble_3"],
+#                               "4 Models" => ["Ensemble_4"],
+#                               "\\phantom{iiiiiii}5 Models" => ["Ensemble_5"],
+#                              )
+
+
+# for d in datasets
+#     hre_plot(results[d], comparison_algs)
+#     savefig("analysis/FOR CLASS/ensembles_wilds_$d.pdf")
+# end
+
+
+# sup_algs = ["torchvision_vit_b_16_IMAGENET1K_V1", "torchvision_vit_l_16_IMAGENET1K_V1"]
+# swag_algs = ["torchvision_vit_b_16_IMAGENET1K_SWAG_LINEAR_V1", "torchvision_vit_l_16_IMAGENET1K_SWAG_LINEAR_V1", "torchvision_vit_h_14_IMAGENET1K_SWAG_LINEAR_V1"]
+# clip_algs = ["open_clip_vit_b_16_openai", "open_clip_vit_l_14_openai", "open_clip_vit_h_14_laion2b_s32b_b79k"]
+# mae_algs = ["mae_vit_b_16_DEFAULT", "mae_vit_l_16_DEFAULT", "mae_vit_h_14_DEFAULT"]
+
+# comparison_algs = OrderedDict(
+#                               "\\phantom{iiir}Supervised" => sup_algs,
+#                               "SWAG" => swag_algs,
+#                               "CLIP" => clip_algs,
+#                               "MAE" => mae_algs)
+
+# for d in datasets
+#     hre_plot(results[d], comparison_algs)
+#     savefig("analysis/FOR CLASS/pretraining_$d.pdf")
+# end

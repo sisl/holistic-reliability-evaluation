@@ -1,4 +1,4 @@
-using Plots; 
+using Plots, StatsPlots 
 
 Plots.reset_defaults()
 pgfplotsx()
@@ -167,6 +167,26 @@ function correlation(allx, ally)
     return cor(allx, ally)
 end
 
+function adjusted_correlation(allx, ally, groups)
+    unique_groups = unique(groups)
+    zs = [Float64.(groups .== g) for g in unique_groups]
+
+    fx = Term(:x) ~ sum(term.([Symbol("z$i") for i=1:length(zs)]))
+    fy = Term(:y) ~ sum(term.([Symbol("z$i") for i=1:length(zs)]))
+    pairs = [:x=>allx, :y=>ally, [Symbol("z$i") => zs[i] for i=1:length(zs)]...]
+    data =  DataFrame(pairs...)
+    
+    modelx = lm(fx, data)
+    modely = lm(fy, data)
+    
+    x_adjusted = allx .- (coef(modelx)[1] .+ sum([coef(modelx)[1+i] .* zs[i] for i=1:length(zs)]))
+    y_adjusted = ally .- (coef(modely)[1] .+ sum([coef(modely)[1+i] .* zs[i] for i=1:length(zs)]))
+    
+    cor(x_adjusted, y_adjusted)
+    # adjusted_model = lm(@formula(y ~ x), DataFrame(x=x_adjusted, y=y_adjusted))
+
+end
+
 function correlation(dataset_results, symx, symy)
     xvals, xalgs = get_all_by_alg(dataset_results, symx)
     yvals, yalgs = get_all_by_alg(dataset_results, symy)
@@ -263,9 +283,13 @@ function single_metric_comp(results, metric, metric_name, baseline_algs, compari
 end
 
 
-function plot_correlations(arrs, names; ylabels=true, annotate_rval=true, kwargs...)
+function plot_correlations(arrs, names; ylabels=true, annotate_rval=true, groups=nothing, kwargs...)
     N = length(names)
-    fn(x,y) = y < x ? NaN : correlation(arrs[x], arrs[y])
+    fn = (x,y) -> y < x ? NaN : correlation(arrs[x], arrs[y])
+    if !isnothing(groups)
+        fn = (x,y) -> y < x ? NaN : adjusted_correlation(arrs[x], arrs[y], groups)
+    end
+    
     p = heatmap(1:N, 1:N, fn, cmap=:PiYG, clims=(-1,1), xrotation=45; colorbar=true, alpha=1, kwargs...)
     if annotate_rval
         for x in 1:N
