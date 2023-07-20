@@ -290,7 +290,7 @@ function plot_correlations(arrs, names; ylabels=true, annotate_rval=true, groups
         fn = (x,y) -> y < x ? NaN : adjusted_correlation(arrs[x], arrs[y], groups)
     end
     
-    p = heatmap(1:N, 1:N, fn, cmap=:PiYG, clims=(-1,1), xrotation=45; colorbar=true, alpha=1, kwargs...)
+    p = heatmap(1:N, 1:N, fn, cmap=:PiYG, clims=(-1,1), xrotation=45; colorbar=true, grid=false, alpha=1, kwargs...)
     if annotate_rval
         for x in 1:N
             for y in x:N
